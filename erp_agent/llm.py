@@ -17,6 +17,36 @@ SUPPORTED_INTENTS = {
 
 DEFAULT_INTENT = "generate_purchase_po"
 
+# 小模型往往不严格遵循英文枚举，会把意图写成中文/口语变体。
+# 归一化层把这些变体映射回白名单，避免 LLM 结果被白白回退。
+_ACTION_ALIASES = {
+    "generate_purchase_po": {
+        "generate_purchase_po", "generate po", "generate purchase po",
+        "生成采购po", "生成采购单", "生成po", "创建采购po", "创建po", "生成采购", "采购po",
+    },
+    "query_materials": {
+        "query_materials", "query material", "查询物料", "查物料", "查询价格", "查价格", "查询", "只查",
+    },
+    "unknown": {"unknown", "未知", "无法判断"},
+}
+
+_ACTION_HINTS = (
+    ("generate_purchase_po", ("生成", "创建", "采购", "create", "purchase")),
+    ("query_materials", ("查询", "查价", "查物料", "query")),
+)
+
+
+def _normalize_action(raw: str) -> str | None:
+    """把模型输出的意图（中英文、口语变体）归一化到白名单；无法识别返回 None。"""
+    value = (raw or "").strip().lower()
+    for canonical, aliases in _ACTION_ALIASES.items():
+        if value in aliases:
+            return canonical
+    # 模糊兜底：按关键词判断；若同时命中多类，保守返回 None 交给确定性回退。
+    hits = [canonical for canonical, hints in _ACTION_HINTS if any(h in value for h in hints)]
+    action = hits[0] if len(hits) == 1 else None
+    return action if action in SUPPORTED_INTENTS else None
+
 
 @dataclass(frozen=True)
 class Intent:
@@ -28,13 +58,16 @@ class Intent:
 
 def _default_prompt(task: str) -> str:
     return (
-        "你是外贸 ERP 采购助手的意图识别模块。只输出 JSON，不要输出任何其他内容。\n"
-        "根据用户对业务任务的描述，判断其意图。可选意图只有三种：\n"
+        "你是外贸 ERP 采购助手的意图识别模块。只输出一行 JSON，不要输出任何解释或其他内容。\n"
+        "根据用户描述判断意图，action 只能取以下三个英文值之一：\n"
         '- "generate_purchase_po"：用户要生成采购 PO 草稿；\n'
         '- "query_materials"：用户只想查询物料、价格或包装费信息；\n'
         '- "unknown"：无法判断。\n'
-        '输出格式严格为：{"action": "<意图>", "reason": "<一句话原因>"}\n\n'
-        f"用户描述：{task}"
+        "示例：\n"
+        '用户说"帮我生成采购PO" → {"action":"generate_purchase_po","reason":"生成采购单"}\n'
+        '用户说"查一下这个物料多少钱" → {"action":"query_materials","reason":"查询价格"}\n\n'
+        f"现在判断：{task}\n"
+        '输出格式严格为：{"action":"<上述三个值之一>","reason":"<一句话原因>"}'
     )
 
 
@@ -114,9 +147,10 @@ class IntentClassifier:
         parsed = _extract_json(content)
         if not parsed:
             return self._classify_fallback(task)  # 输出非法，回退
-        action = str(parsed.get("action", "")).strip()
-        if action not in SUPPORTED_INTENTS:
-            return self._classify_fallback(task)  # 白名单外，回退
+        action = _normalize_action(str(parsed.get("action", "")))
+        if action is None or action == "unknown":
+            # 模型无法判断或输出白名单外 → 交给确定性规则兜底。
+            return self._classify_fallback(task)
         reason = str(parsed.get("reason", "")).strip()
         return Intent(action=action, source="llm", model=self.model, reasoning=reason)
 

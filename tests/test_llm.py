@@ -47,6 +47,28 @@ class IntentClassifierTest(unittest.TestCase):
             intent = classifier.classify("全部删掉")
         self.assertEqual(intent.source, "fallback")
 
+    def test_llm_chinese_alias_is_normalized(self):
+        # 小模型常输出中文枚举，归一化层应映射回白名单而非回退。
+        classifier = IntentClassifier(base_url="http://x/v1", model="m")
+        fake_response = {"choices": [{"message": {"content": '{"action": "生成采购PO"}'}}]}
+        with patch("requests.post") as post:
+            post.return_value.raise_for_status.return_value = None
+            post.return_value.json.return_value = fake_response
+            intent = classifier.classify("帮我生成采购 PO")
+        self.assertEqual(intent.source, "llm")
+        self.assertEqual(intent.action, "generate_purchase_po")
+
+    def test_llm_unknown_falls_back(self):
+        # 模型返回 unknown 表示放弃判断，应交给确定性规则兜底。
+        classifier = IntentClassifier(base_url="http://x/v1", model="m")
+        fake_response = {"choices": [{"message": {"content": '{"action": "unknown", "reason": "不确定"}'}}]}
+        with patch("requests.post") as post:
+            post.return_value.raise_for_status.return_value = None
+            post.return_value.json.return_value = fake_response
+            intent = classifier.classify("帮我生成采购 PO")
+        self.assertEqual(intent.source, "fallback")
+        self.assertEqual(intent.action, "generate_purchase_po")
+
     def test_llm_network_error_falls_back(self):
         classifier = IntentClassifier(base_url="http://x/v1", model="m", timeout=1)
         with patch("requests.post", side_effect=Exception("boom")):
