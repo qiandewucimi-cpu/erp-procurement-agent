@@ -30,7 +30,7 @@ tab_chat, tab_audit = st.tabs(["Agent 对话", "订单与审计"])
 def render_trace(trace: list[dict]) -> None:
     if not trace:
         return
-    with st.expander("查看 Agent 工具调用轨迹", expanded=False):
+    with st.expander("查看 Agent 工具调用轨迹", expanded=True):
         for item in trace:
             step = item.get("step", "?")
             tool = item.get("tool", "")
