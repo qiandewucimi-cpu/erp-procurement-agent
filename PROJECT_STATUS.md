@@ -113,6 +113,14 @@
 - 处理：Repository 新增统一 `session()`，确保提交后关闭连接。
 - 当前状态：已解决，测试数据库可正常清理。
 
+### P-005：换机后 Demo 无法启动
+
+- 现象：双击 `start_demo.cmd` 无反应，项目"打不开"。
+- 根因：两个问题叠加——当前机器 PATH 上没有 python；即使有，新环境也没有安装 fastapi/streamlit/uvicorn 等依赖（原环境为 2026-08 验证时所用，未随项目迁移）。
+- 处理：在项目内新建 `.venv` 并安装 requirements.txt；`start_demo.cmd` 与 `start_demo.ps1` 改为优先使用项目内 `.venv\Scripts\python.exe`，无 .venv 时回退 PATH 上的 python 并给出创建提示。
+- 当前状态：已解决并重新验证（2026-09-07）：单测 3/3 通过；`launch_demo.py` 启动后 API `/health` 与 Streamlit 页面均返回 HTTP 200。
+- 附带修复：requirements.txt 的 pydantic==2.13.4 首次安装时报"No matching distribution"（代理下 simple index 瞬时异常），重试后安装成功，版本号本身有效，无需改动。
+
 ## 6. 当前缺口
 
 以下内容尚未完成，不能在面试中声称已经实现：
@@ -189,6 +197,16 @@
 ```
 
 ## 11. 工作日志
+
+### 2026-09-07 16:05
+
+- 本次目标：修复"Demo 打不开"并准备 GitHub 发布副本。
+- 实际完成：诊断出 PATH 无 python + 依赖缺失；项目内新建 `.venv` 装齐依赖；两个启动脚本改为优先用 .venv；验证单测 3/3、API/health 200、页面 200。另建桌面干净副本 `Desktop\erp-procurement-agent`（排除《离职前三天现场信息采集清单.md》、data/*.db、__pycache__、.venv，补 .gitignore 与 data/.gitkeep），已 git init 并完成首个 commit。
+- 改动文件：`start_demo.cmd`、`start_demo.ps1`、本文件、新增 `.venv`（不入库）；副本目录另计。
+- 验证命令与结果：`.venv\Scripts\python.exe -m unittest discover -s tests -v` 3/3 OK；`launch_demo.py` 启动后 curl 两端口均 200。
+- 遇到的问题：pydantic==2.13.4 首次 pip 报 No matching distribution，重试成功（见 P-005）。
+- 遗留问题：GitHub 远程仓库未创建，待用户建空仓库后 push。
+- 下一步第一动作：用户在 GitHub 创建空仓库 `erp-procurement-agent` 后推送副本。
 
 ### 2026-08-18 10:35
 
