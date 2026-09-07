@@ -1,6 +1,6 @@
 # 外贸 ERP 安全操作 Agent
 
-这是一个面向 FDE / AI 应用工程岗位的可运行作品：用完全合成的数据还原“BOM → 采购 PO”流程，展示 RAG 检索、工具调用、业务校验、写前确认、幂等、审计和回滚。
+这是一个面向 FDE / AI 应用工程岗位的可运行作品：用完全合成的数据还原“BOM → 采购 PO”流程，展示**工具调用循环 Agent**（Function Calling）、多轮对话、MCP 工具暴露、RAG 检索、业务校验、写前确认、幂等、审计和回滚。
 
 项目当前进度、问题、缺口和下一步统一记录在 `PROJECT_STATUS.md`。每次实质改动结束前都应同步更新该文件。
 
@@ -8,29 +8,33 @@
 
 ## 一、3 分钟能看到什么
 
-1. 选择 `正常示例_BOM.xlsx`，让 Agent 生成采购 PO。
-2. 查看 Agent 的五步工具轨迹和 RAG 规则来源。
-3. 查看三行采购明细、价格/包装费来源和总金额。
-4. 输入 `确认提交` 后才写入模拟 ERP；重复点击不会重复建单。
+1. 用自然语言对话：「帮我根据 `正常示例_BOM.xlsx` 生成采购 PO 草稿，先给我看金额」。
+2. 模型自主决定调用工具（可展开看工具调用轨迹），生成草稿并停下等确认。
+3. 输入 `确认提交`，模型才会调用写入工具；重复确认不会重复建单。
+4. 追问「查一下 MAT-FAB-001 的价格」——模型只查询、不建单，体会 agent 的多轮能力。
 5. 切到“订单与审计”查看操作记录，再演示回滚。
 6. 换成 `异常示例_BOM.xlsx`，展示未建档物料和非法数量如何阻止写入。
 
 ## 二、架构
 
 ```text
-Streamlit 工作台
+Streamlit 聊天工作台（多轮对话）
       │ HTTP/JSON
       ▼
 FastAPI Agent API
-      ├─ 意图识别：可选 LLM（本地 Ollama / 云端千问·智谱），失败自动回退规则
-      ├─ Markdown 规则库：检索并返回来源
-      ├─ BOM 解析工具：XLSX / CSV
-      ├─ 模拟 ERP 工具：SQLite 物料、价格、包装费
-      ├─ 业务校验器：必填、档案、数量、供应商、币种
-      └─ 安全执行层：预览 → 明文确认 → 幂等写入 → 审计/回滚
+      ├─ /agent/chat：工具调用循环（模型自主编排）
+      │     ├─ search_knowledge  规则检索
+      │     ├─ query_materials   物料/价格查询（只读）
+      │     ├─ create_purchase_order  生成草稿预览
+      │     ├─ confirm_commit    写入（需口令，幂等）
+      │     └─ rollback_po       回滚
+      └─ /agent/prepare：确定性六步流水线（离线兼容）
+
+MCP Server（mcp_server.py）
+      └─ 把上述 5 个工具暴露为标准 MCP 工具，供任意 MCP 客户端调用
 ```
 
-核心设计是“可靠工作流 Agent”：模型只用于理解业务意图（自然语言 → 结构化意图），关键金额计算、校验和写入权限不交给概率模型决定。因此当前 Demo 即使没有 Ollama、没有云端 Key，也能稳定运行。
+核心设计是「受控工具调用 Agent」：模型通过 Function Calling 自主决定调用哪个工具、传什么参数、调用顺序与次数，因此具备 agent 的多轮、自主编排能力；但**金额计算、业务校验和写入口令始终由确定性代码完成**，模型只做编排不做决定。断网或模型幻觉都不会造成错误写入。
 
 ## 三、本地启动
 
@@ -81,6 +85,8 @@ python -m py_compile api.py ui.py erp_agent\*.py
 
 当前自动化测试覆盖：
 
+- 工具层：正常/异常草稿、金额验算（¥24164）、写入口令、幂等、回滚、物料查询；
+- 工具调用循环：模型调工具→返回结果→停止、无工具直接回复、多轮历史；
 - 意图识别：LLM 正常/白名单外/网络异常/回退规则；
 - 正常 BOM 生成草稿并确认写入；
 - 同一 action_id 重复确认不重复建单；
@@ -90,33 +96,11 @@ python -m py_compile api.py ui.py erp_agent\*.py
 - BOM 解析（CSV、表头别名、空行、非法格式）；
 - API 层（健康检查、确认幂等、404/409、缺文件 400）。
 
-## 四·一、可选 LLM 意图识别（双链路）
+## 四·一、模型配置（工具调用循环）
 
-Agent 的第一步会把自然语言任务识别为结构化意图。LLM 只做这一步，且**失败自动回退到确定性规则**，因此不配置也能跑。配置优先级：本地 Ollama → 云端千问/智谱。
+`/agent/chat` 依赖具备工具调用（Function Calling）能力的模型来编排工具。模型只做编排，金额/校验/写入仍在确定性代码里；不配置模型时 `/agent/chat` 返回不可用提示，`/agent/prepare` 仍可离线运行。
 
-### 方式一：本地 Ollama（默认，离线可用）
-
-```powershell
-ollama serve
-ollama pull qwen2:1.5b
-```
-
-复制 `.env.example` 为 `.env`，确认：
-
-```dotenv
-LLM_BASE_URL=http://127.0.0.1:11434/v1
-LLM_MODEL=qwen2:1.5b
-```
-
-### 方式二：云端千问 DashScope
-
-```dotenv
-LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-LLM_MODEL=qwen-plus
-LLM_API_KEY=sk-你的key
-```
-
-### 方式三：云端智谱
+### 方式一：云端智谱（推荐，开箱即用）
 
 ```dotenv
 LLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4
@@ -124,34 +108,52 @@ LLM_MODEL=glm-4-flash
 LLM_API_KEY=你的key
 ```
 
-不配置 `LLM_BASE_URL` 时，Agent 走离线规则回退，功能不受影响。
+### 方式二：本地 Ollama（离线，需较大模型）
 
-意图识别的安全设计：模型输出会经过「白名单 + 中文别名归一化」校验——小模型即使把意图写成中文（如"生成采购PO"）也能正确映射回枚举；输出白名单之外或无法判断（`unknown`）时，自动交给确定性规则兜底。因此模型幻觉、误判或断网都不会影响金额、校验与写入。
+```powershell
+ollama pull qwen2.5:7b
+```
+
+```dotenv
+LLM_BASE_URL=http://127.0.0.1:11434/v1
+LLM_MODEL=qwen2.5:7b
+```
+
+> 注意：`qwen2:1.5b` 这类小模型工具调用不稳定（连意图都常判错），建议至少 `qwen2.5:3b`、推荐 `qwen2.5:7b`。
+
+意图识别与工具编排的安全设计：模型输出经白名单与别名归一化校验；金额计算、业务校验、写入口令全部由确定性代码执行。因此模型幻觉、误判或断网都不会影响金额、校验与写入。
 
 ## 五、主要接口
 
 | 方法 | 路径 | 作用 |
 |---|---|---|
 | GET | `/health` | 健康检查与演示模式声明 |
-| POST | `/agent/prepare` | 检索规则、解析 BOM、查询档案并生成预览 |
+| POST | `/agent/chat` | 多轮对话：模型自主编排工具完成采购业务 |
+| POST | `/agent/prepare` | 确定性六步流水线（离线兼容） |
 | POST | `/agent/confirm` | 使用明确口令确认写入 |
 | POST | `/agent/rollback` | 回滚已写入的采购 PO |
 | GET | `/orders` | 查看模拟 ERP 单据 |
 | GET | `/audit` | 查看审计日志 |
 
+另有 `mcp_server.py`：把 5 个工具暴露为标准 MCP 工具，可接入任意 MCP 客户端（Claude Desktop、Cursor 等）。
+
 ## 六、代码阅读顺序
 
-1. `erp_agent/agent.py`：完整 Agent 编排。
-2. `erp_agent/parser.py`：BOM 文件解析。
-3. `erp_agent/knowledge.py`：离线 RAG 检索和来源返回。
-4. `erp_agent/repository.py`：SQLite、预览、幂等、审计和回滚。
-5. `api.py`：FastAPI 接口。
-6. `ui.py`：Streamlit 演示页。
+1. `erp_agent/tools.py`：5 个业务工具的 schema 与确定性实现（金额/校验/口令都在这里）。
+2. `erp_agent/llm.py`：`AgentLoop` 工具调用循环 + `IntentClassifier` 意图识别。
+3. `erp_agent/agent.py`：`chat()` 多轮入口 + `prepare()` 兼容流水线。
+4. `erp_agent/parser.py`：BOM 文件解析。
+5. `erp_agent/knowledge.py`：离线 RAG 检索和来源返回。
+6. `erp_agent/repository.py`：SQLite、预览、幂等、审计和回滚。
+7. `api.py`：FastAPI 接口。
+8. `mcp_server.py`：MCP 工具暴露。
+9. `ui.py`：Streamlit 聊天演示页。
 
 ## 七、面试时要诚实说明的边界
 
 - 真实经历：亲自完成过 BOM 到采购 PO 的业务流程，并基于一线体验识别痛点。
 - 作品实现：使用合成数据与模拟 ERP 还原流程，没有接入公司生产系统。
+- 当前 Agent：工具调用循环 Agent（Function Calling），模型自主编排但关键决策由确定性代码兜底；不是完全自主智能体。
 - 当前 RAG：轻量本地检索，重点是可追溯和离线稳定；后续可替换为 BGE + Chroma/PGVector。
-- 当前 Agent：受控工作流 Agent，不声称是完全自主智能体；企业写操作必须把确定性规则和权限放在 LLM 之外。
+- 企业写操作必须把确定性规则、权限和审计放在 LLM 之外——本项目正是按此原则设计的。
 - 待生产化：SSO/RBAC、审批、密钥管理、队列、监控、真实 API 适配器、评测集与灰度发布。

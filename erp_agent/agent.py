@@ -4,14 +4,20 @@ import base64
 from pathlib import Path
 
 from .knowledge import KnowledgeBase
-from .llm import IntentClassifier
+from .llm import AgentLoop, IntentClassifier
 from .models import Citation, PrepareResponse, ToolStep, ValidationIssue
 from .parser import parse_bom
 from .repository import ERPRepository
+from .tools import ToolRegistry
 
 
 class PurchasePOAgent:
-    """围绕“BOM → 采购 PO”的可解释、安全工作流 Agent。"""
+    """围绕“BOM → 采购 PO”的可解释、安全工作流 Agent。
+
+    提供两种入口：
+    - chat()：多轮对话，模型通过工具调用循环自主编排（agent 感来源）；
+    - prepare()：保留的确定性六步流水线（离线也可用，向后兼容）。
+    """
 
     def __init__(
         self,
@@ -19,11 +25,39 @@ class PurchasePOAgent:
         knowledge: KnowledgeBase,
         samples_dir: Path,
         intent_classifier: IntentClassifier | None = None,
+        agent_loop: AgentLoop | None = None,
     ):
         self.repository = repository
         self.knowledge = knowledge
         self.samples_dir = samples_dir
         self.intent_classifier = intent_classifier or IntentClassifier()
+        self.tools = ToolRegistry(repository, knowledge, samples_dir)
+        self.loop = agent_loop or AgentLoop()
+        self.sessions: dict[str, list[dict]] = {}
+
+    def chat(self, messages: list[dict], session_id: str | None = None) -> dict:
+        """多轮对话入口：模型自主调用工具完成采购业务。
+
+        messages 为 OpenAI 格式对话历史（含 role 与 content）。
+        传入 session_id 时，会接续该会话的完整上下文（模型能记住之前的 action_id）。
+        返回 {"reply", "tool_trace", "model", "llm_enabled"}。
+        """
+        if session_id and session_id in self.sessions:
+            full = self.sessions[session_id] + list(messages)
+        else:
+            full = list(messages)
+        reply, trace, full = self.loop.run(full, self.tools)
+        if session_id:
+            self.sessions[session_id] = full
+        desc_map = {s["function"]["name"]: s["function"]["description"] for s in self.tools.schemas}
+        for item in trace:
+            item["purpose"] = desc_map.get(item["tool"], "")
+        return {
+            "reply": reply,
+            "tool_trace": trace,
+            "model": self.loop.model,
+            "llm_enabled": self.loop.enabled,
+        }
 
     def prepare(self, task: str, filename: str, content_base64: str | None = None) -> PrepareResponse:
         trace: list[ToolStep] = []

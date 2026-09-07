@@ -8,8 +8,8 @@
 
 | 项目 | 当前状态 |
 |---|---|
-| 最后更新时间 | 2026-09-07 21:10（Asia/Shanghai） |
-| 当前版本 | v0.2 可运行 MVP（新增可选 LLM 意图识别） |
+| 最后更新时间 | 2026-09-07 22:50（Asia/Shanghai） |
+| 当前版本 | v0.3 工具调用循环 Agent（Function Calling + 多轮对话 + MCP） |
 | 当前阶段 | 核心闭环已完成，等待用户本机体验与现场业务规则复核 |
 | 主业务场景 | BOM → 采购 PO |
 | 目标受众 | 秋招 FDE / AI 应用工程岗位面试官 |
@@ -36,7 +36,10 @@
 ### 3.1 核心后端
 
 - [x] FastAPI 服务与健康检查；
-- [x] 意图识别：可选 LLM（本地 Ollama / 云端千问·智谱，双链路），失败自动回退确定性规则；
+- [x] 工具调用循环 Agent：模型通过 Function Calling 自主编排 5 个工具（search_knowledge / query_materials / create_purchase_order / confirm_commit / rollback_po）；
+- [x] 多轮对话：`/agent/chat` 接口 + session 记忆（模型能记住上一轮的 action_id）；
+- [x] MCP 工具暴露：`mcp_server.py` 用 FastMCP 把 5 个工具暴露为标准 MCP 工具；
+- [x] 意图识别：可选 LLM（本地 Ollama / 云端千问·智谱），失败自动回退确定性规则；
 - [x] BOM `.xlsx` / `.xlsm` / `.csv` 解析；
 - [x] Markdown 业务规则分块与离线检索；
 - [x] 可展示来源、章节、摘要和检索分数；
@@ -53,7 +56,8 @@
 
 ### 3.2 演示与交付
 
-- [x] Streamlit Agent 工作台；
+- [x] Streamlit 聊天式工作台（多轮对话）；
+- [x] 工具调用轨迹可视化展示；
 - [x] 正常合成 BOM；
 - [x] 包含未建档、非法数量和名称差异的异常 BOM；
 - [x] Agent 工具执行轨迹展示；
@@ -83,6 +87,9 @@
 | 2026-08-18 | Streamlit 页面 | 通过，HTTP 200 |
 | 2026-08-18 | `docker compose config --quiet` | 通过 |
 | 2026-08-18 | `start_demo.cmd` 完整启动 | 通过 |
+| 2026-09-07 | 工具调用循环真实冒烟（智谱 glm-4-flash） | 通过：模型自主调用 create_purchase_order 生成 ¥24164 草稿并停下等确认 |
+| 2026-09-07 | 多轮对话确认写入 | 通过：第二轮模型调 confirm_commit 写入 PO-DEMO-20260907-* |
+| 2026-09-07 | 全量测试 | 34/34 通过 |
 
 ## 5. 已遇到并解决的问题
 
@@ -173,6 +180,8 @@
 | 2026-08-18 | 使用合成 BOM 和虚构档案 | 满足隐私、保密和作品公开要求 |
 | 2026-08-18 | 新增 `.cmd` 启动方式 | 兼容公司电脑的 PowerShell 策略限制 |
 | 2026-09-07 | 意图识别采用本地+云端双链路 | 本地 Ollama 符合离线/学习路线，云端 API 保底质量；统一走 OpenAI 兼容接口 |
+| 2026-09-07 | 从固定六步流水线升级为工具调用循环 Agent | 用户反馈"没体会到 agent"，对标 GitHub 同类项目后确定：agent 感来自模型自主编排工具，而非固定流水线；安全边界由工具内部确定性代码保证 |
+| 2026-09-07 | 云端模型默认用智谱 glm-4-flash | 小模型（qwen2:1.5b）工具调用不稳，glm-4-flash 支持 function calling 且稳定 |
 
 ## 9. 下一步执行顺序
 
@@ -199,6 +208,16 @@
 ```
 
 ## 11. 工作日志
+
+### 2026-09-07 22:50
+
+- 本次目标：用户反馈"没体会到 agent、项目太低级"，对标 GitHub 同类项目后，把固定流水线升级为工具调用循环 Agent + MCP + 聊天 UI（一次到位）。
+- 实际完成：新增 `erp_agent/tools.py`（5 个工具的 schema 与确定性实现：search_knowledge/query_materials/create_purchase_order/confirm_commit/rollback_po）；`llm.py` 新增 `AgentLoop` 工具调用循环 + `.env` 自动加载；`agent.py` 新增 `chat()` 多轮入口 + session 记忆，保留 `prepare()` 兼容；`api.py` 新增 `POST /agent/chat`；`ui.py` 改为聊天式多轮对话；新增 `mcp_server.py`（FastMCP 暴露 5 个工具）；新增 `tests/test_agent_loop.py`。
+- 改动文件：`erp_agent/tools.py`（新增）、`erp_agent/llm.py`、`erp_agent/agent.py`、`erp_agent/models.py`、`api.py`、`ui.py`、`mcp_server.py`（新增）、`tests/test_agent_loop.py`（新增）、`.env`（新增，不入库）、`.env.example`、`README.md`、本文件。
+- 验证命令与结果：`python -m unittest discover -s tests -v` 34/34 OK；真实智谱 glm-4-flash 冒烟通过——模型自主调用 create_purchase_order 生成 ¥24164 草稿并停下等确认，第二轮多轮对话调 confirm_commit 写入 PO-DEMO-20260907-D8C8。
+- 遇到的问题：云端 key 从数据助手项目 `.env` 复用（智谱 glm-4-flash）；mcp SDK 安装中（走代理较慢）。
+- 遗留问题：mcp_server.py 需在 mcp 装好后做 stdio 冒烟验证；Docker 仍未真实构建。
+- 下一步第一动作：验证 MCP server 可用后，同步发布副本并 push GitHub。
 
 ### 2026-09-07 21:10
 

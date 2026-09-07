@@ -11,6 +11,11 @@ class PrepareRequest(BaseModel):
     content_base64: str | None = None
 
 
+class ChatRequest(BaseModel):
+    messages: list[dict[str, Any]] = Field(description="OpenAI 格式对话历史（含 role 与 content）")
+    session_id: str | None = Field(default=None, description="会话 ID，传入后接续该会话上下文")
+
+
 class ConfirmRequest(BaseModel):
     action_id: str
     confirmation: str

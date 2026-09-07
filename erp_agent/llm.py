@@ -4,8 +4,32 @@ import json
 import os
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 import requests
+
+
+def _load_dotenv(path: Path | None = None) -> None:
+    """轻量加载项目根目录的 .env（不引入 python-dotenv 依赖）。
+
+    只读 KEY=VALUE 行，跳过注释与空行，且不覆盖已存在的环境变量。
+    """
+    if path is None:
+        path = Path(__file__).resolve().parent.parent / ".env"
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+_load_dotenv()
 
 
 # 白名单：LLM 只允许产出这些意图，其余一律回退默认，防止模型幻觉引入越权动作。
@@ -162,3 +186,99 @@ class IntentClassifier:
         else:
             action, reason = DEFAULT_INTENT, "未识别到特定意图，默认按生成采购 PO 处理"
         return Intent(action=action, source="fallback", model=None, reasoning=reason)
+
+
+# 工具调用循环的系统提示：明确安全边界，约束模型只做编排不做决定。
+AGENT_SYSTEM_PROMPT = (
+    "你是外贸 ERP 采购操作助手，通过调用工具帮用户完成「BOM → 采购 PO」业务。\n"
+    "规则：\n"
+    "1. 你只能调用给定的工具，不要凭空编造物料、价格或单号。\n"
+    "2. 金额、业务校验和最终写入由工具内部完成，你不要自己计算或断言金额。\n"
+    "3. 生成采购单后，必须先停下来，把 action_id、金额、校验问题告诉用户，等待用户输入「确认提交」后才调用 confirm_commit。\n"
+    "4. 用户只是想查价格时，用 query_materials，不要建单。\n"
+    "5. 用简体中文、口语化、简洁地回复用户。"
+)
+
+
+class AgentLoop:
+    """工具调用循环：模型自主决定调用哪个工具、传什么参数、调用顺序与次数。
+
+    这是「agent 感」的来源——模型不再被写死的步骤牵着走，而是每轮根据
+    工具返回结果自己规划下一步。安全边界由工具内部保证（见 tools.py）。
+    """
+
+    def __init__(
+        self,
+        base_url: str | None = None,
+        model: str | None = None,
+        api_key: str | None = None,
+        timeout: float = 30.0,
+    ):
+        self.base_url = (base_url if base_url is not None else os.getenv("LLM_BASE_URL", "")).rstrip("/")
+        self.model = model or os.getenv("LLM_MODEL", "glm-4-flash")
+        self.api_key = api_key if api_key is not None else os.getenv("LLM_API_KEY", "")
+        self.timeout = timeout
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.base_url)
+
+    def _chat(self, messages: list[dict], tools: list[dict] | None = None) -> dict:
+        url = f"{self.base_url}/chat/completions"
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        payload = {"model": self.model, "messages": messages, "temperature": 0, "stream": False}
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
+        response = requests.post(url, json=payload, headers=headers, timeout=self.timeout)
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]
+
+    def run(self, messages: list[dict], tool_registry, max_steps: int = 8) -> tuple[str, list[dict], list[dict]]:
+        """执行工具循环，返回 (最终回复文本, 工具调用轨迹, 完整消息历史)。
+
+        - 轨迹每项：{"step": int, "tool": str, "arguments": dict, "result": str}
+        - 完整消息历史不含 system 前缀，可直接作为下一轮多轮对话的输入。
+        """
+        trace: list[dict] = []
+        msgs = [{"role": "system", "content": AGENT_SYSTEM_PROMPT}, *messages]
+
+        for _ in range(max_steps):
+            try:
+                msg = self._chat(msgs, tools=tool_registry.schemas)
+            except Exception as exc:
+                reply = f"（模型暂时不可用，未能完成编排：{type(exc).__name__}）"
+                return reply, trace, msgs[1:]
+
+            tool_calls = msg.get("tool_calls") or []
+            if not tool_calls:
+                return msg.get("content") or "", trace, msgs[1:]
+
+            # 规范化 assistant 消息里的 tool_calls，确保 arguments 是字符串。
+            norm_calls = []
+            for tc in tool_calls:
+                fn = tc.get("function") or {}
+                args_raw = fn.get("arguments")
+                args_str = args_raw if isinstance(args_raw, str) else json.dumps(args_raw, ensure_ascii=False)
+                norm_calls.append(
+                    {
+                        "id": tc.get("id", ""),
+                        "type": "function",
+                        "function": {"name": fn.get("name", ""), "arguments": args_str},
+                    }
+                )
+            msgs.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": norm_calls})
+
+            for tc in norm_calls:
+                name = tc["function"]["name"]
+                try:
+                    arguments = json.loads(tc["function"]["arguments"] or "{}")
+                except json.JSONDecodeError:
+                    arguments = {}
+                result = tool_registry.call(name, arguments)
+                trace.append({"step": len(trace) + 1, "tool": name, "arguments": arguments, "result": result})
+                msgs.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
+
+        return "（已达到最大工具调用步数，请检查是否陷入循环）", trace, msgs[1:]

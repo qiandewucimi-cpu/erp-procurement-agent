@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException
 
 from erp_agent.agent import PurchasePOAgent
 from erp_agent.knowledge import KnowledgeBase
-from erp_agent.models import ConfirmRequest, PrepareRequest, PrepareResponse, RollbackRequest
+from erp_agent.models import ChatRequest, ConfirmRequest, PrepareRequest, PrepareResponse, RollbackRequest
 from erp_agent.repository import ERPRepository
 
 
@@ -33,6 +33,15 @@ def samples() -> list[str]:
 def prepare(request: PrepareRequest) -> PrepareResponse:
     try:
         return agent.prepare(request.task, request.filename, request.content_base64)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/agent/chat")
+def chat(request: ChatRequest) -> dict:
+    """多轮对话入口：模型通过工具调用循环自主编排采购业务。"""
+    try:
+        return agent.chat(request.messages, request.session_id)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
