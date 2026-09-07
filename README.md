@@ -22,6 +22,7 @@ Streamlit 工作台
       │ HTTP/JSON
       ▼
 FastAPI Agent API
+      ├─ 意图识别：可选 LLM（本地 Ollama / 云端千问·智谱），失败自动回退规则
       ├─ Markdown 规则库：检索并返回来源
       ├─ BOM 解析工具：XLSX / CSV
       ├─ 模拟 ERP 工具：SQLite 物料、价格、包装费
@@ -29,7 +30,7 @@ FastAPI Agent API
       └─ 安全执行层：预览 → 明文确认 → 幂等写入 → 审计/回滚
 ```
 
-核心设计是“可靠工作流 Agent”：模型可用于增强自然语言理解，但关键金额计算、校验和写入权限不能交给概率模型决定，因此当前 Demo 即使没有 Ollama 也能稳定运行。
+核心设计是“可靠工作流 Agent”：模型只用于理解业务意图（自然语言 → 结构化意图），关键金额计算、校验和写入权限不交给概率模型决定。因此当前 Demo 即使没有 Ollama、没有云端 Key，也能稳定运行。
 
 ## 三、本地启动
 
@@ -80,11 +81,50 @@ python -m py_compile api.py ui.py erp_agent\*.py
 
 当前自动化测试覆盖：
 
+- 意图识别：LLM 正常/白名单外/网络异常/回退规则；
 - 正常 BOM 生成草稿并确认写入；
 - 同一 action_id 重复确认不重复建单；
 - 错误确认口令被拒绝；
 - 异常 BOM 被阻断；
-- 已提交采购 PO 可回滚且保留审计记录。
+- 已提交采购 PO 可回滚且保留审计记录；
+- BOM 解析（CSV、表头别名、空行、非法格式）；
+- API 层（健康检查、确认幂等、404/409、缺文件 400）。
+
+## 四·一、可选 LLM 意图识别（双链路）
+
+Agent 的第一步会把自然语言任务识别为结构化意图。LLM 只做这一步，且**失败自动回退到确定性规则**，因此不配置也能跑。配置优先级：本地 Ollama → 云端千问/智谱。
+
+### 方式一：本地 Ollama（默认，离线可用）
+
+```powershell
+ollama serve
+ollama pull qwen2:1.5b
+```
+
+复制 `.env.example` 为 `.env`，确认：
+
+```dotenv
+LLM_BASE_URL=http://127.0.0.1:11434/v1
+LLM_MODEL=qwen2:1.5b
+```
+
+### 方式二：云端千问 DashScope
+
+```dotenv
+LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+LLM_MODEL=qwen-plus
+LLM_API_KEY=sk-你的key
+```
+
+### 方式三：云端智谱
+
+```dotenv
+LLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+LLM_MODEL=glm-4-flash
+LLM_API_KEY=你的key
+```
+
+不配置 `LLM_BASE_URL` 时，Agent 走离线规则回退，功能不受影响。
 
 ## 五、主要接口
 

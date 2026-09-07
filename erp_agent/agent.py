@@ -4,6 +4,7 @@ import base64
 from pathlib import Path
 
 from .knowledge import KnowledgeBase
+from .llm import IntentClassifier
 from .models import Citation, PrepareResponse, ToolStep, ValidationIssue
 from .parser import parse_bom
 from .repository import ERPRepository
@@ -12,17 +13,37 @@ from .repository import ERPRepository
 class PurchasePOAgent:
     """围绕“BOM → 采购 PO”的可解释、安全工作流 Agent。"""
 
-    def __init__(self, repository: ERPRepository, knowledge: KnowledgeBase, samples_dir: Path):
+    def __init__(
+        self,
+        repository: ERPRepository,
+        knowledge: KnowledgeBase,
+        samples_dir: Path,
+        intent_classifier: IntentClassifier | None = None,
+    ):
         self.repository = repository
         self.knowledge = knowledge
         self.samples_dir = samples_dir
+        self.intent_classifier = intent_classifier or IntentClassifier()
 
     def prepare(self, task: str, filename: str, content_base64: str | None = None) -> PrepareResponse:
         trace: list[ToolStep] = []
         issues: list[ValidationIssue] = []
 
+        # 第 1 步：意图识别（可选 LLM，失败回退确定性规则）。
+        # 安全边界：LLM 只产出「意图」，不参与金额计算、业务校验或写入决策。
+        intent = self.intent_classifier.classify(task)
+        intent_source = f"{intent.model}（{intent.source}）" if intent.model else "确定性规则（offline）"
+        trace.append(
+            ToolStep(
+                step=1,
+                tool="intent_recognition",
+                purpose="用模型理解业务意图（可选，失败自动回退）",
+                result=f"意图={intent.action} · {intent_source} · {intent.reasoning}",
+            )
+        )
+
         citations_raw = self.knowledge.search(f"{task} 采购 PO BOM 单价 包装费 写入确认", top_k=3)
-        trace.append(ToolStep(step=1, tool="knowledge_search", purpose="查询采购 PO 字段与安全规则", result=f"命中 {len(citations_raw)} 条规则"))
+        trace.append(ToolStep(step=2, tool="knowledge_search", purpose="查询采购 PO 字段与安全规则", result=f"命中 {len(citations_raw)} 条规则"))
 
         if content_base64:
             content = base64.b64decode(content_base64)
@@ -34,7 +55,7 @@ class PurchasePOAgent:
             content = source_path.read_bytes()
             source = source_path.name
         rows = parse_bom(source, content)
-        trace.append(ToolStep(step=2, tool="parse_bom", purpose="解析 BOM 物料与需求数量", result=f"解析到 {len(rows)} 行物料"))
+        trace.append(ToolStep(step=3, tool="parse_bom", purpose="解析 BOM 物料与需求数量", result=f"解析到 {len(rows)} 行物料"))
         if not rows:
             issues.append(ValidationIssue(level="blocking", field="BOM", message="没有解析到有效物料行"))
 
@@ -76,7 +97,7 @@ class PurchasePOAgent:
                     "data_sources": ["上传的 BOM", "模拟 ERP 物料档案", "模拟价格/包装费表"],
                 }
             )
-        trace.append(ToolStep(step=3, tool="query_material_master", purpose="查询物料、供应商、价格和包装费", result=f"匹配 {len(items)}/{len(rows)} 行"))
+        trace.append(ToolStep(step=4, tool="query_material_master", purpose="查询物料、供应商、价格和包装费", result=f"匹配 {len(items)}/{len(rows)} 行"))
 
         if len(suppliers) > 1:
             issues.append(ValidationIssue(level="blocking", field="供应商", message="物料属于多个供应商，应拆分采购 PO"))
@@ -95,15 +116,15 @@ class PurchasePOAgent:
             "items": items,
             "total_amount": round(sum(item["line_amount"] for item in items), 2),
         }
-        trace.append(ToolStep(step=4, tool="validate_purchase_po", purpose="执行必填、档案、供应商和币种校验", result="通过，可等待确认" if ready else "存在阻断问题，禁止写入"))
+        trace.append(ToolStep(step=5, tool="validate_purchase_po", purpose="执行必填、档案、供应商和币种校验", result="通过，可等待确认" if ready else "存在阻断问题，禁止写入"))
 
         payload = {"ready": ready, "draft": draft, "issues": [issue.model_dump() for issue in issues]}
         action_id = self.repository.create_pending(payload)
-        trace.append(ToolStep(step=5, tool="create_change_preview", purpose="保存变更预览而不写入正式业务表", result=f"生成待确认操作 {action_id}"))
+        trace.append(ToolStep(step=6, tool="create_change_preview", purpose="保存变更预览而不写入正式业务表", result=f"生成待确认操作 {action_id}"))
         return PrepareResponse(
             action_id=action_id,
             status="ready_for_confirmation" if ready else "blocked",
-            intent="根据 BOM 生成并校验采购 PO 草稿",
+            intent=f"{intent.action}：{intent.reasoning}",
             message="草稿已生成；输入“确认提交”后才会写入模拟 ERP。" if ready else "草稿存在阻断问题，已禁止提交。",
             draft=draft,
             issues=issues,
