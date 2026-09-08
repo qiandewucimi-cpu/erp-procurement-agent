@@ -73,3 +73,8 @@ def orders() -> list[dict]:
 def audit() -> list[dict]:
     return repository.audits()
 
+
+@app.get("/error_reports")
+def error_reports() -> list[dict]:
+    return repository.error_reports()
+

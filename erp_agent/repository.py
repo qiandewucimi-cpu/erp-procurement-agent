@@ -69,6 +69,14 @@ class ERPRepository:
                     detail_json TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS error_reports (
+                    report_id TEXT PRIMARY KEY,
+                    status TEXT NOT NULL,
+                    summary_json TEXT NOT NULL,
+                    errors_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    pushed_at TEXT
+                );
                 """
             )
             con.executemany(
@@ -157,4 +165,31 @@ class ERPRepository:
     def audits(self) -> list[dict]:
         with self.session() as con:
             rows = con.execute("SELECT * FROM audit_logs ORDER BY id DESC").fetchall()
+        return [dict(row) for row in rows]
+
+    def save_error_report(self, summary: dict, errors: list[dict], operator: str = "demo_user") -> str:
+        """把错误报告写入 error_reports 表，模拟推送到录单员的消息队列（outbox）。"""
+        report_id = f"ERR-{uuid4().hex[:10].upper()}"
+        with self.session() as con:
+            con.execute(
+                "INSERT INTO error_reports VALUES (?, 'PENDING_PUSH', ?, ?, ?, NULL)",
+                (
+                    report_id,
+                    json.dumps(summary, ensure_ascii=False),
+                    json.dumps(errors, ensure_ascii=False),
+                    _now(),
+                ),
+            )
+            self._audit(
+                con,
+                report_id,
+                "ERROR_REPORT_CREATED",
+                operator,
+                {"blocking": summary["blocking"], "warning": summary["warning"]},
+            )
+        return report_id
+
+    def error_reports(self) -> list[dict]:
+        with self.session() as con:
+            rows = con.execute("SELECT * FROM error_reports ORDER BY created_at DESC").fetchall()
         return [dict(row) for row in rows]

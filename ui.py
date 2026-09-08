@@ -63,6 +63,7 @@ with tab_chat:
                 "你好，我是采购操作助手。你可以直接用自然语言让我办事，比如：\n\n"
                 "- 「帮我根据 **正常示例_BOM.xlsx** 生成采购 PO 草稿，先给我看金额」\n"
                 "- 「查一下 MAT-FAB-001 的价格和包装费」\n"
+                "- 「检测一下 **异常示例_BOM.xlsx** 有哪些物料错误」\n"
                 "- 生成草稿后，输入「**确认提交**」我才会真正写入模拟 ERP"
             )
 
@@ -94,9 +95,12 @@ with tab_audit:
     try:
         orders = api("GET", "/orders")
         audits = api("GET", "/audit")
+        reports = api("GET", "/error_reports")
         st.subheader("模拟 ERP 采购 PO")
         st.dataframe(pd.DataFrame(orders), use_container_width=True, hide_index=True)
         st.subheader("审计日志")
         st.dataframe(pd.DataFrame(audits), use_container_width=True, hide_index=True)
+        st.subheader("物料错误报告（推送队列）")
+        st.dataframe(pd.DataFrame(reports), use_container_width=True, hide_index=True)
     except Exception as exc:
         st.warning(f"后端尚未启动：{exc}")

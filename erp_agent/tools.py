@@ -7,6 +7,7 @@ from .knowledge import KnowledgeBase
 from .models import ValidationIssue
 from .parser import parse_bom
 from .repository import ERPRepository
+from .validator import MaterialAuditor
 
 
 class ToolRegistry:
@@ -24,6 +25,7 @@ class ToolRegistry:
         self.repository = repository
         self.knowledge = knowledge
         self.samples_dir = samples_dir
+        self.auditor = MaterialAuditor(repository)
 
     # ------------------------------------------------------------------ #
     # 工具 schema（OpenAI function-calling 格式，模型靠它理解工具）
@@ -109,6 +111,22 @@ class ToolRegistry:
                     },
                 },
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "detect_material_errors",
+                    "description": "检测 BOM 物料的错误（未建档/名称不一致/数量非法/单价缺失/包装费缺失/供应商缺失），分级生成错误报告；push=true 时把报告写入推送队列。",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "filename": {"type": "string", "description": "BOM 文件名，如「正常示例_BOM.xlsx」"},
+                            "min_level": {"type": "string", "enum": ["warning", "blocking"], "description": "只报该级别及以上的错误，默认 warning（全报）"},
+                            "push": {"type": "boolean", "description": "true 时把错误报告写入推送队列（模拟推送给录单员），默认 false 只检测不推送"},
+                        },
+                        "required": ["filename"],
+                    },
+                },
+            },
         ]
 
     # ------------------------------------------------------------------ #
@@ -121,6 +139,7 @@ class ToolRegistry:
             "create_purchase_order": self._create_purchase_order,
             "confirm_commit": self._confirm_commit,
             "rollback_po": self._rollback_po,
+            "detect_material_errors": self._detect_material_errors,
         }.get(name)
         if handler is None:
             return json.dumps({"ok": False, "error": f"未知工具：{name}"}, ensure_ascii=False)
@@ -263,3 +282,31 @@ class ToolRegistry:
             return json.dumps({"ok": True, **result}, ensure_ascii=False)
         except KeyError as exc:
             return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
+
+    def _detect_material_errors(self, args: dict) -> str:
+        filename = str(args.get("filename", ""))
+        min_level = str(args.get("min_level", "warning"))
+        push = bool(args.get("push", False))
+        source_path = (self.samples_dir / Path(filename).name).resolve()
+        if source_path.parent != self.samples_dir.resolve() or not source_path.exists():
+            return json.dumps({"ok": False, "error": f"文件不存在：{filename}，可用示例见 /samples 接口"}, ensure_ascii=False)
+        try:
+            rows = parse_bom(source_path.name, source_path.read_bytes())
+        except Exception as exc:
+            return json.dumps({"ok": False, "error": f"解析失败：{exc}"}, ensure_ascii=False)
+
+        report = self.auditor.audit_bom(rows, min_level=min_level)
+        report_id = None
+        if push:
+            report_id = self.repository.save_error_report(report["summary"], report["errors"])
+        return json.dumps(
+            {
+                "ok": True,
+                "report_id": report_id,
+                "pushed": push,
+                "summary": report["summary"],
+                "errors": report["errors"],
+                "push_text": report["push_text"],
+            },
+            ensure_ascii=False,
+        )

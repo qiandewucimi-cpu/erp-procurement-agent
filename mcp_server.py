@@ -49,5 +49,11 @@ def rollback_po(action_id: str, reason: str, operator: str = "demo_user") -> str
     return tools.call("rollback_po", {"action_id": action_id, "reason": reason, "operator": operator})
 
 
+@mcp.tool()
+def detect_material_errors(filename: str, min_level: str = "warning", push: bool = False) -> str:
+    """检测 BOM 物料错误（未建档/名称不一致/数量非法/单价缺失/包装费缺失/供应商缺失），分级生成报告；push=true 时写入推送队列。"""
+    return tools.call("detect_material_errors", {"filename": filename, "min_level": min_level, "push": push})
+
+
 if __name__ == "__main__":
     mcp.run()
