@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>外贸 ERP 安全操作 Agent · 系统架构</title>
+<style>
+  :root {
+    --bg: #f8fafc;
+    --ink: #1e293b;
+    --muted: #64748b;
+    --line: #cbd5e1;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Microsoft YaHei", sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px 48px;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+  .card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    padding: 8px;
+    max-width: 1120px;
+    width: 100%;
+  }
+  svg { width: 100%; height: auto; display: block; }
+  .box-title { font-size: 14px; font-weight: 700; fill: #0f172a; }
+  .box-sub { font-size: 11px; fill: #475569; }
+  .legend { font-size: 12px; fill: #475569; }
+  .layer-label { font-size: 11px; font-weight: 700; fill: #94a3b8; letter-spacing: .5px; }
+</style>
+</head>
+<body>
+  <h1>外贸 ERP 安全操作 Agent · 系统架构</h1>
+  <div class="sub">场景：BOM → 采购 PO + 物料错误检测 ｜ 模型只做编排，金额 / 校验 / 写入口令 / 错误分级由确定性代码兜底</div>
+
+  <div class="card">
+    <svg viewBox="0 0 1120 850" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="系统架构图">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#475569" />
+        </marker>
+        <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+          <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0f172a" flood-opacity="0.10" />
+        </filter>
+      </defs>
+
+      <!-- ===== 连线 ===== -->
+      <path d="M560,106 L560,130" stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+      <path d="M560,172 L560,200" stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+      <path d="M560,274 L560,312" stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+
+      <!-- Agent -> 6 tools (fan) -->
+      <path d="M560,368 C560,388 175,386 175,408" stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+      <path d="M560,368 C560,390 329,388 329,408" stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+      <path d="M560,368 L560,408" stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+      <path d="M560,368 C560,390 637,388 637,408" stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+      <path d="M560,368 C560,390 791,388 791,408" stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+      <path d="M560,368 C560,386 945,384 945,408" stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+
+      <!-- tools -> data -->
+      <path d="M175,486 L255,512" stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+      <path d="M329,486 C329,500 450,500 450,512" stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+      <path d="M483,486 L483,512" stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+      <path d="M637,486 L637,512" stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+      <path d="M791,486 L791,512" stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+      <path d="M945,486 L945,512" stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+
+      <!-- MCP Server -> clients -->
+      <path d="M505,644 L620,644" stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+
+      <!-- ===== 节点 ===== -->
+      <g filter="url(#shadow)">
+        <rect x="480" y="70" width="160" height="36" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="2" />
+      </g>
+      <text x="560" y="93" text-anchor="middle" class="box-title">👤 用户 / 业务人员</text>
+
+      <g filter="url(#shadow)">
+        <rect x="420" y="130" width="280" height="42" rx="8" fill="#e0f2fe" stroke="#0ea5e9" stroke-width="2" />
+      </g>
+      <text x="560" y="156" text-anchor="middle" class="box-title">Streamlit 聊天工作台 (UI)</text>
+
+      <g filter="url(#shadow)">
+        <rect x="360" y="200" width="400" height="74" rx="8" fill="#ccfbf1" stroke="#14b8a6" stroke-width="2" />
+      </g>
+      <text x="560" y="226" text-anchor="middle" class="box-title">FastAPI Agent API</text>
+      <text x="560" y="246" text-anchor="middle" class="box-sub">POST /agent/chat · /prepare · /confirm · /rollback</text>
+      <text x="560" y="264" text-anchor="middle" class="box-sub">GET /orders · /audit · /error_reports · /health</text>
+
+      <g filter="url(#shadow)">
+        <rect x="340" y="312" width="440" height="56" rx="8" fill="#fef3c7" stroke="#f59e0b" stroke-width="2" />
+      </g>
+      <text x="560" y="334" text-anchor="middle" class="box-title">工具调用循环 AgentLoop（Function Calling）</text>
+      <text x="560" y="354" text-anchor="middle" class="box-sub">IntentClassifier 意图识别：LLM 可选，失败回退确定性规则</text>
+
+      <text x="105" y="400" class="layer-label">工具层 (6 个业务工具)</text>
+
+      <g filter="url(#shadow)">
+        <rect x="105" y="408" width="140" height="78" rx="8" fill="#fce7f3" stroke="#ec4899" stroke-width="2" />
+      </g>
+      <text x="175" y="434" text-anchor="middle" class="box-sub" font-weight="700">search_</text>
+      <text x="175" y="449" text-anchor="middle" class="box-sub" font-weight="700">knowledge</text>
+      <text x="175" y="470" text-anchor="middle" class="box-sub">规则检索</text>
+
+      <g filter="url(#shadow)">
+        <rect x="259" y="408" width="140" height="78" rx="8" fill="#fce7f3" stroke="#ec4899" stroke-width="2" />
+      </g>
+      <text x="329" y="434" text-anchor="middle" class="box-sub" font-weight="700">query_</text>
+      <text x="329" y="449" text-anchor="middle" class="box-sub" font-weight="700">materials</text>
+      <text x="329" y="470" text-anchor="middle" class="box-sub">物料查询(只读)</text>
+
+      <g filter="url(#shadow)">
+        <rect x="413" y="408" width="140" height="78" rx="8" fill="#fce7f3" stroke="#ec4899" stroke-width="2" />
+      </g>
+      <text x="483" y="434" text-anchor="middle" class="box-sub" font-weight="700">create_</text>
+      <text x="483" y="449" text-anchor="middle" class="box-sub" font-weight="700">purchase_order</text>
+      <text x="483" y="470" text-anchor="middle" class="box-sub">生成草稿(预览)</text>
+
+      <g filter="url(#shadow)">
+        <rect x="567" y="408" width="140" height="78" rx="8" fill="#fce7f3" stroke="#ec4899" stroke-width="2" />
+      </g>
+      <text x="637" y="434" text-anchor="middle" class="box-sub" font-weight="700">confirm_</text>
+      <text x="637" y="449" text-anchor="middle" class="box-sub" font-weight="700">commit</text>
+      <text x="637" y="470" text-anchor="middle" class="box-sub">确认写入</text>
+
+      <g filter="url(#shadow)">
+        <rect x="721" y="408" width="140" height="78" rx="8" fill="#fce7f3" stroke="#ec4899" stroke-width="2" />
+      </g>
+      <text x="791" y="434" text-anchor="middle" class="box-sub" font-weight="700">rollback_</text>
+      <text x="791" y="449" text-anchor="middle" class="box-sub" font-weight="700">po</text>
+      <text x="791" y="470" text-anchor="middle" class="box-sub">回滚</text>
+
+      <g filter="url(#shadow)">
+        <rect x="875" y="408" width="140" height="78" rx="8" fill="#ede9fe" stroke="#8b5cf6" stroke-width="2" />
+      </g>
+      <text x="945" y="434" text-anchor="middle" class="box-sub" font-weight="700">detect_material_</text>
+      <text x="945" y="449" text-anchor="middle" class="box-sub" font-weight="700">errors</text>
+      <text x="945" y="470" text-anchor="middle" class="box-sub">物料错误检测</text>
+
+      <text x="105" y="504" class="layer-label">数据 &amp; 知识层</text>
+      <g filter="url(#shadow)">
+        <rect x="105" y="512" width="300" height="64" rx="8" fill="#ffe4e6" stroke="#f43f5e" stroke-width="2" />
+      </g>
+      <text x="255" y="538" text-anchor="middle" class="box-title">Markdown 规则库</text>
+      <text x="255" y="558" text-anchor="middle" class="box-sub">RAG 离线检索 + 来源返回</text>
+
+      <g filter="url(#shadow)">
+        <rect x="419" y="512" width="596" height="64" rx="8" fill="#dcfce7" stroke="#10b981" stroke-width="2" />
+      </g>
+      <text x="717" y="538" text-anchor="middle" class="box-title">SQLite 模拟 ERP</text>
+      <text x="717" y="558" text-anchor="middle" class="box-sub">物料档案 · 采购 PO · 审计 · 错误报告队列</text>
+
+      <text x="105" y="612" class="layer-label">外部集成</text>
+      <g filter="url(#shadow)">
+        <rect x="105" y="620" width="400" height="48" rx="8" fill="#ede9fe" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="6 4" />
+      </g>
+      <text x="305" y="646" text-anchor="middle" class="box-sub" font-weight="700">MCP Server（FastMCP）· 复用同一套 6 个工具</text>
+
+      <g filter="url(#shadow)">
+        <rect x="620" y="620" width="395" height="48" rx="8" fill="#ede9fe" stroke="#8b5cf6" stroke-width="2" />
+      </g>
+      <text x="817" y="646" text-anchor="middle" class="box-sub" font-weight="700">任意 MCP 客户端（Claude Desktop / Cursor…）</text>
+
+      <g filter="url(#shadow)">
+        <rect x="105" y="720" width="910" height="56" rx="10" fill="#f1f5f9" stroke="#475569" stroke-width="2" />
+      </g>
+      <text x="560" y="744" text-anchor="middle" class="box-title">🛡 安全边界</text>
+      <text x="560" y="764" text-anchor="middle" class="box-sub">金额计算 / 业务校验 / 写入口令 / 错误分级 全部由确定性代码完成 —— 模型只编排、不决策，断网或幻觉都不会错误写入</text>
+
+      <g transform="translate(105,802)">
+        <rect x="0" y="0" width="14" height="14" rx="3" fill="#eef2ff" stroke="#6366f1" stroke-width="2" />
+        <text x="22" y="11" class="legend">交互</text>
+        <rect x="90" y="0" width="14" height="14" rx="3" fill="#ccfbf1" stroke="#14b8a6" stroke-width="2" />
+        <text x="112" y="11" class="legend">API</text>
+        <rect x="170" y="0" width="14" height="14" rx="3" fill="#fef3c7" stroke="#f59e0b" stroke-width="2" />
+        <text x="192" y="11" class="legend">Agent 核心</text>
+        <rect x="290" y="0" width="14" height="14" rx="3" fill="#fce7f3" stroke="#ec4899" stroke-width="2" />
+        <text x="312" y="11" class="legend">业务工具</text>
+        <rect x="400" y="0" width="14" height="14" rx="3" fill="#ede9fe" stroke="#8b5cf6" stroke-width="2" />
+        <text x="422" y="11" class="legend">新增工具 / MCP</text>
+        <rect x="570" y="0" width="14" height="14" rx="3" fill="#dcfce7" stroke="#10b981" stroke-width="2" />
+        <text x="592" y="11" class="legend">数据</text>
+        <rect x="660" y="0" width="14" height="14" rx="3" fill="#ffe4e6" stroke="#f43f5e" stroke-width="2" />
+        <text x="682" y="11" class="legend">知识</text>
+      </g>
+    </svg>
+  </div>
+</body>
+</html>

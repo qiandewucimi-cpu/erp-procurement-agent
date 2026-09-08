@@ -8,7 +8,7 @@
 
 | 项目 | 当前状态 |
 |---|---|
-| 最后更新时间 | 2026-09-07 22:50（Asia/Shanghai） |
+| 最后更新时间 | 2026-09-08 14:08（Asia/Shanghai） |
 | 当前版本 | v0.3 工具调用循环 Agent（Function Calling + 多轮对话 + MCP） |
 | 当前阶段 | 核心闭环已完成，等待用户本机体验与现场业务规则复核 |
 | 主业务场景 | BOM → 采购 PO |
@@ -208,6 +208,26 @@
 ```
 
 ## 11. 工作日志
+
+### 2026-09-08 14:08
+
+- 本次目标：把新工具 `detect_material_errors` 接入 MCP 暴露、FastAPI、Streamlit UI 和面试脚本，让演示可点出。
+- 实际完成：`api.py` 新增 `GET /error_reports`；`mcp_server.py` 新增 `detect_material_errors` MCP 工具；`ui.py` 欢迎语加物料错误检测示例、审计页加"物料错误报告（推送队列）"展示；`面试演示脚本.md` 补痛点陈述 + 检测演示段 + 推送落地追问；`architecture.html` 升级 v2（6 工具 + error_reports + MCP 复用说明）。
+- 改动文件：`api.py`、`mcp_server.py`、`ui.py`、`面试演示脚本.md`、`architecture.html`、本文件。
+- 验证命令与结果：`.venv/Scripts/python.exe -m py_compile api.py ui.py mcp_server.py erp_agent/*.py` 通过；`unittest discover` 48/48 OK；工具层 + API 层冒烟：detect 检出 3 错误、push 落库 1 条、`/health` `/error_reports` `/samples` 均 200。
+- 遇到的问题：冒烟脚本误传 str 给 KnowledgeBase（需 Path），已修正。
+- 遗留问题：mcp_server.py 尚未做 stdio 真实冒烟（mcp 包依赖）；Docker 仍未真实构建。
+- 下一步第一动作：本机 `start_demo.cmd` 跑一遍完整 UI 演示，录屏/截图补充作品集。
+
+### 2026-09-08 11:58
+
+- 本次目标：回应用户"demo 用途不清"的焦虑，落地第二个业务工具「物料错误检测」，让项目从单流程变有真实痛点支撑的方案。
+- 实际完成：新增 `erp_agent/validator.py`（`MaterialValidator` 单行校验 7 类错误 + `MaterialAuditor` 批量审计/报告/推送文本）；`tools.py` 新增 `detect_material_errors` 工具（min_level 过滤 + push 落库）；`repository.py` 新增 `error_reports` 表（outbox 模式）+ `save_error_report` + `error_reports`；新增 `tests/test_material_errors.py`（14 用例）；新增知识库 `物料错误检测规则.md`；另产架构图 `architecture.html` 与 `用途定位与面试话术.md`、`物料错误检测_设计说明.md`。
+- 改动文件：`erp_agent/validator.py`（新增）、`erp_agent/tools.py`、`erp_agent/repository.py`、`tests/test_material_errors.py`（新增）、`knowledge/物料错误检测规则.md`（新增）、`architecture.html`、`用途定位与面试话术.md`、`物料错误检测_设计说明.md`、本文件。
+- 验证命令与结果：`.venv/Scripts/python.exe -m unittest discover -s tests -v` → 48/48 OK（原 34 个零回归，新增 14 个）。
+- 遇到的问题：无。
+- 遗留问题：`detect_material_errors` 尚未接入 MCP 暴露与 Streamlit UI；`create_purchase_order` 的校验逻辑仍未切到 validator（可复用但为保稳定未动）；真实推送 webhook/定时任务未接。
+- 下一步第一动作：把新工具暴露到 MCP 与 UI，并在面试脚本里加一段"物料错误自动推送"演示。
 
 ### 2026-09-07 22:50
 
