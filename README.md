@@ -1,6 +1,12 @@
 # 外贸 ERP 安全操作 Agent
 
-这是一个面向 FDE / AI 应用工程岗位的可运行作品：用完全合成的数据还原“BOM → 采购 PO”流程，展示**工具调用循环 Agent**（Function Calling）、多轮对话、MCP 工具暴露、RAG 检索、业务校验、写前确认、幂等、审计和回滚。
+![CI](https://github.com/qiandewucimi-cpu/erp-procurement-agent/actions/workflows/ci.yml/badge.svg)
+![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
+![coverage](https://img.shields.io/badge/coverage-88%25-brightgreen)
+![eval](https://img.shields.io/badge/eval-15%2F15%20passed-success)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+这是一个面向 FDE / AI 应用工程岗位的可运行作品：用完全合成的数据还原“BOM → 采购 PO”流程，展示**工具调用循环 Agent**（Function Calling）、多轮对话、MCP 工具暴露、RAG 检索、业务校验、写前确认、幂等、审计和回滚，并配套**可复现的能力评测集**。
 
 项目当前进度、问题、缺口和下一步统一记录在 `PROJECT_STATUS.md`。每次实质改动结束前都应同步更新该文件。
 
@@ -17,21 +23,21 @@
 
 ## 二、架构
 
-```text
-Streamlit 聊天工作台（多轮对话）
-      │ HTTP/JSON
-      ▼
-FastAPI Agent API
-      ├─ /agent/chat：工具调用循环（模型自主编排）
-      │     ├─ search_knowledge  规则检索
-      │     ├─ query_materials   物料/价格查询（只读）
-      │     ├─ create_purchase_order  生成草稿预览
-      │     ├─ confirm_commit    写入（需口令，幂等）
-      │     └─ rollback_po       回滚
-      └─ /agent/prepare：确定性六步流水线（离线兼容）
-
-MCP Server（mcp_server.py）
-      └─ 把上述 5 个工具暴露为标准 MCP 工具，供任意 MCP 客户端调用
+```mermaid
+flowchart TB
+    U[用户] -->|自然语言| UI[Streamlit 聊天工作台]
+    UI -->|HTTP/JSON| API[FastAPI Agent API]
+    API --> LOOP{工具调用循环<br/>AgentLoop}
+    LOOP --> SK[search_knowledge<br/>规则检索]
+    LOOP --> QM[query_materials<br/>物料/价格查询 · 只读]
+    LOOP --> CP[create_purchase_order<br/>生成草稿预览]
+    LOOP --> CC[confirm_commit<br/>写入 · 需口令 · 幂等]
+    LOOP --> RB[rollback_po<br/>回滚]
+    CP --> DB[(SQLite 模拟 ERP)]
+    CC --> DB
+    RB --> DB
+    SK --> KB[(Markdown 规则库)]
+    MCP[MCP Server<br/>mcp_server.py] -.->|暴露 5 个标准工具| EXT[任意 MCP 客户端]
 ```
 
 核心设计是「受控工具调用 Agent」：模型通过 Function Calling 自主决定调用哪个工具、传什么参数、调用顺序与次数，因此具备 agent 的多轮、自主编排能力；但**金额计算、业务校验和写入口令始终由确定性代码完成**，模型只做编排不做决定。断网或模型幻觉都不会造成错误写入。
@@ -96,6 +102,17 @@ python -m py_compile api.py ui.py erp_agent\*.py
 - BOM 解析（CSV、表头别名、空行、非法格式）；
 - API 层（健康检查、确认幂等、404/409、缺文件 400）。
 
+### 能力评测（evals）
+
+项目内置评测集 `evals/`，用 15 个用例量化 Agent 能力，覆盖 7 个维度：金额正确性、异常识别与阻断、写操作安全边界、幂等写入、回滚可追溯、工具选择准确率、安全指令遵守率。
+
+```powershell
+python evals/run_eval.py --offline   # 确定性层，无需模型密钥（CI 使用）
+python evals/run_eval.py             # 全量，真实调用模型
+```
+
+最近一次全量评测：**15/15 通过，准确率 100%**（含“只查询不得建单”等安全对抗用例）。完整报告见 `evals/REPORT.md`，随每次评测自动刷新。
+
 ## 四·一、模型配置（工具调用循环）
 
 `/agent/chat` 依赖具备工具调用（Function Calling）能力的模型来编排工具。模型只做编排，金额/校验/写入仍在确定性代码里；不配置模型时 `/agent/chat` 返回不可用提示，`/agent/prepare` 仍可离线运行。
@@ -156,4 +173,4 @@ LLM_MODEL=qwen2.5:7b
 - 当前 Agent：工具调用循环 Agent（Function Calling），模型自主编排但关键决策由确定性代码兜底；不是完全自主智能体。
 - 当前 RAG：轻量本地检索，重点是可追溯和离线稳定；后续可替换为 BGE + Chroma/PGVector。
 - 企业写操作必须把确定性规则、权限和审计放在 LLM 之外——本项目正是按此原则设计的。
-- 待生产化：SSO/RBAC、审批、密钥管理、队列、监控、真实 API 适配器、评测集与灰度发布。
+- 待生产化：SSO/RBAC、审批、密钥管理、队列、监控、真实 API 适配器与灰度发布。
