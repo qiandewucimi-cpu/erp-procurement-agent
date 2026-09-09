@@ -46,7 +46,7 @@
   <div class="sub">场景：BOM → 采购 PO + 物料错误检测 ｜ 模型只做编排，金额 / 校验 / 写入口令 / 错误分级由确定性代码兜底</div>
 
   <div class="card">
-    <svg viewBox="0 0 1120 850" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="系统架构图">
+    <svg viewBox="0 0 1120 1000" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="系统架构图">
       <defs>
         <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M0,0 L10,5 L0,10 z" fill="#475569" />
@@ -95,7 +95,7 @@
         <rect x="360" y="200" width="400" height="74" rx="8" fill="#ccfbf1" stroke="#14b8a6" stroke-width="2" />
       </g>
       <text x="560" y="226" text-anchor="middle" class="box-title">FastAPI Agent API</text>
-      <text x="560" y="246" text-anchor="middle" class="box-sub">POST /agent/chat · /prepare · /confirm · /rollback</text>
+      <text x="560" y="246" text-anchor="middle" class="box-sub">POST /agent/chat · /prepare · /detect · /confirm · /rollback</text>
       <text x="560" y="264" text-anchor="middle" class="box-sub">GET /orders · /audit · /error_reports · /health</text>
 
       <g filter="url(#shadow)">
@@ -178,7 +178,38 @@
       <text x="560" y="744" text-anchor="middle" class="box-title">🛡 安全边界</text>
       <text x="560" y="764" text-anchor="middle" class="box-sub">金额计算 / 业务校验 / 写入口令 / 错误分级 全部由确定性代码完成 —— 模型只编排、不决策，断网或幻觉都不会错误写入</text>
 
-      <g transform="translate(105,802)">
+      <!-- ===== 部署 & 验证（Docker Compose） ===== -->
+      <text x="105" y="812" class="layer-label">部署 &amp; 验证（Docker Compose · 已真实构建并跑通）</text>
+
+      <g filter="url(#shadow)">
+        <rect x="105" y="822" width="290" height="76" rx="8" fill="#e0e7ff" stroke="#4f46e5" stroke-width="2" />
+      </g>
+      <text x="250" y="848" text-anchor="middle" class="box-title">🐳 容器 api</text>
+      <text x="250" y="868" text-anchor="middle" class="box-sub">uvicorn api:app</text>
+      <text x="250" y="886" text-anchor="middle" class="box-sub">宿主机 :8000 → 容器 :8000</text>
+
+      <g filter="url(#shadow)">
+        <rect x="415" y="822" width="290" height="76" rx="8" fill="#e0e7ff" stroke="#4f46e5" stroke-width="2" />
+      </g>
+      <text x="560" y="848" text-anchor="middle" class="box-title">🐳 容器 ui</text>
+      <text x="560" y="868" text-anchor="middle" class="box-sub">streamlit run ui.py</text>
+      <text x="560" y="886" text-anchor="middle" class="box-sub">ERP_AGENT_API = http://api:8000（服务名互通）</text>
+
+      <g filter="url(#shadow)">
+        <rect x="725" y="822" width="290" height="76" rx="8" fill="#e0e7ff" stroke="#4f46e5" stroke-width="2" />
+      </g>
+      <text x="870" y="848" text-anchor="middle" class="box-title">💾 数据卷 erp_demo_data</text>
+      <text x="870" y="868" text-anchor="middle" class="box-sub">SQLite 落盘 /app/data</text>
+      <text x="870" y="886" text-anchor="middle" class="box-sub">容器重启后数据不丢</text>
+
+      <g filter="url(#shadow)">
+        <rect x="105" y="912" width="910" height="48" rx="10" fill="#ecfdf5" stroke="#059669" stroke-width="2" />
+      </g>
+      <text x="560" y="941" text-anchor="middle" class="box-sub" font-weight="700">
+        ✅ 已验证：容器端到端冒烟 8/8 ｜ MCP stdio 6 工具 ｜ 镜像内无 .env 与明文密钥 ｜ 数据卷持久化 ｜ 单测 48/48 ｜ CI 双 Python 版本
+      </text>
+
+      <g transform="translate(105,978)">
         <rect x="0" y="0" width="14" height="14" rx="3" fill="#eef2ff" stroke="#6366f1" stroke-width="2" />
         <text x="22" y="11" class="legend">交互</text>
         <rect x="90" y="0" width="14" height="14" rx="3" fill="#ccfbf1" stroke="#14b8a6" stroke-width="2" />
@@ -193,6 +224,8 @@
         <text x="592" y="11" class="legend">数据</text>
         <rect x="660" y="0" width="14" height="14" rx="3" fill="#ffe4e6" stroke="#f43f5e" stroke-width="2" />
         <text x="682" y="11" class="legend">知识</text>
+        <rect x="750" y="0" width="14" height="14" rx="3" fill="#e0e7ff" stroke="#4f46e5" stroke-width="2" />
+        <text x="772" y="11" class="legend">容器部署</text>
       </g>
     </svg>
   </div>
