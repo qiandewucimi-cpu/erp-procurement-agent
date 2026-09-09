@@ -29,7 +29,20 @@ app = FastAPI(
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "mode": "synthetic-demo", "production_connected": False}
+    """健康检查，同时回传 LLM 可用性，便于前端显示「模型是否真的在工作」。"""
+    return {
+        "status": "ok",
+        "mode": "synthetic-demo",
+        "production_connected": False,
+        "llm_enabled": agent.loop.enabled,
+        "llm_model": agent.loop.model,
+    }
+
+
+@app.get("/materials")
+def materials() -> list[dict]:
+    """列出模拟 ERP 的物料档案（编码、名称、供应商、单价、包装费、币种）。"""
+    return repository.materials()
 
 
 @app.get("/samples")

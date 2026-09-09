@@ -167,6 +167,12 @@ class ERPRepository:
             rows = con.execute("SELECT * FROM audit_logs ORDER BY id DESC").fetchall()
         return [dict(row) for row in rows]
 
+    def materials(self) -> list[dict]:
+        """列出模拟 ERP 的物料档案，供 UI 提示「哪些编码能匹配」。"""
+        with self.session() as con:
+            rows = con.execute("SELECT * FROM materials ORDER BY material_code").fetchall()
+        return [dict(row) for row in rows]
+
     def save_error_report(self, summary: dict, errors: list[dict], operator: str = "demo_user") -> str:
         """把错误报告写入 error_reports 表，模拟推送到录单员的消息队列（outbox）。"""
         report_id = f"ERR-{uuid4().hex[:10].upper()}"
