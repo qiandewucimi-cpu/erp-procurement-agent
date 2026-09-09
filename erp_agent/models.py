@@ -11,6 +11,12 @@ class PrepareRequest(BaseModel):
     content_base64: str | None = None
 
 
+class DetectRequest(BaseModel):
+    filename: str = Field(description="BOM 文件名，如「异常示例_BOM.xlsx」")
+    min_level: Literal["warning", "blocking"] = Field(default="warning", description="只报该级别及以上的错误")
+    push: bool = Field(default=False, description="true 时把错误报告写入推送队列（模拟推送给录单员）")
+
+
 class ChatRequest(BaseModel):
     messages: list[dict[str, Any]] = Field(description="OpenAI 格式对话历史（含 role 与 content）")
     session_id: str | None = Field(default=None, description="会话 ID，传入后接续该会话上下文")

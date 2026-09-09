@@ -1,0 +1,46 @@
+# 密钥与环境变量：绝不能进镜像
+.env
+.env.*
+!.env.example
+
+# 本地虚拟环境与缓存
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 运行时数据（SQLite 模拟库），由 volume 挂载提供
+data/*.db
+data/*.db-journal
+
+# 测试、覆盖率与评测产物
+tests/
+evals/
+.coverage
+.coverage.*
+htmlcov/
+*.log
+
+# 版本控制与 CI
+.git/
+.github/
+.gitignore
+
+# 内部资料：不进入任何镜像/公开产物
+离职前三天现场信息采集清单.md
+
+# 注意：不能全局排除 *.md —— knowledge/ 下的规则文档是 .md，
+# 排除后 Agent 的规则检索会失效。只排除根目录的说明性文档。
+/*.md
+architecture.html
+
+# 编辑器与系统文件
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

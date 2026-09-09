@@ -14,7 +14,7 @@ if exist ".venv\Scripts\python.exe" (
 
 "%PY%" -c "import fastapi, streamlit" >nul 2>nul
 if errorlevel 1 (
-    echo [错误] 缺少依赖，这是发布副本吗？请到工作目录 rongheng-erp-agent 下运行。
+    echo [错误] 缺少依赖，请安装：.venv\Scripts\python.exe -m pip install -r requirements.txt
     pause
     exit /b 1
 )

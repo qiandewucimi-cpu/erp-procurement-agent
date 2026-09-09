@@ -1,10 +1,18 @@
+import json
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 
 from erp_agent.agent import PurchasePOAgent
 from erp_agent.knowledge import KnowledgeBase
-from erp_agent.models import ChatRequest, ConfirmRequest, PrepareRequest, PrepareResponse, RollbackRequest
+from erp_agent.models import (
+    ChatRequest,
+    ConfirmRequest,
+    DetectRequest,
+    PrepareRequest,
+    PrepareResponse,
+    RollbackRequest,
+)
 from erp_agent.repository import ERPRepository
 
 
@@ -35,6 +43,23 @@ def prepare(request: PrepareRequest) -> PrepareResponse:
         return agent.prepare(request.task, request.filename, request.content_base64)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/agent/detect")
+def detect(request: DetectRequest) -> dict:
+    """物料错误检测：解析 BOM → 逐行校验 → 生成分级错误报告。
+
+    push=true 时把报告写入推送队列（error_reports 表，模拟推送给录单员），
+    之后可通过 GET /error_reports 查看。
+    """
+    raw = agent.tools.call(
+        "detect_material_errors",
+        {"filename": request.filename, "min_level": request.min_level, "push": request.push},
+    )
+    result = json.loads(raw)
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "物料错误检测失败"))
+    return result
 
 
 @app.post("/agent/chat")
