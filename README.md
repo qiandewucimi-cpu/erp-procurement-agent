@@ -79,7 +79,26 @@ python -m streamlit run ui.py
 docker compose up --build
 ```
 
-然后访问 `http://localhost:8501`。
+然后访问 UI `http://localhost:8501`、API 文档 `http://127.0.0.1:8000/docs`。
+
+验证容器是否真的跑通（8 项检查：健康检查、核心端点、容器内业务链路、UI 健康）：
+
+```powershell
+python smoke_docker.py
+```
+
+> 网络提示：若 `docker compose build` 卡在拉取 `python:3.13-slim`，说明直连 Docker Hub 不通。
+> 在 `%USERPROFILE%\.docker\daemon.json` 加入 `registry-mirrors` 并重启 Docker Desktop 即可：
+> ```json
+> { "registry-mirrors": ["https://docker.1panel.live", "https://docker.m.daocloud.io"] }
+> ```
+> 注意：给 daemon 配代理通常无效，因为代理软件一般只监听 `127.0.0.1`，WSL2 经 NAT 访问不到。
+
+MCP 工具也可单独验证（stdio 协议，6 个工具）：
+
+```powershell
+python smoke_mcp.py
+```
 
 ## 四、验证
 

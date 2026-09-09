@@ -8,7 +8,7 @@
 
 | 项目 | 当前状态 |
 |---|---|
-| 最后更新时间 | 2026-09-08 14:08（Asia/Shanghai） |
+| 最后更新时间 | 2026-09-09 09:55（Asia/Shanghai） |
 | 当前版本 | v0.3 工具调用循环 Agent（Function Calling + 多轮对话 + MCP） |
 | 当前阶段 | 核心闭环已完成，等待用户本机体验与现场业务规则复核 |
 | 主业务场景 | BOM → 采购 PO |
@@ -36,9 +36,9 @@
 ### 3.1 核心后端
 
 - [x] FastAPI 服务与健康检查；
-- [x] 工具调用循环 Agent：模型通过 Function Calling 自主编排 5 个工具（search_knowledge / query_materials / create_purchase_order / confirm_commit / rollback_po）；
+- [x] 工具调用循环 Agent：模型通过 Function Calling 自主编排 6 个工具（search_knowledge / query_materials / create_purchase_order / confirm_commit / rollback_po / detect_material_errors）；
 - [x] 多轮对话：`/agent/chat` 接口 + session 记忆（模型能记住上一轮的 action_id）；
-- [x] MCP 工具暴露：`mcp_server.py` 用 FastMCP 把 5 个工具暴露为标准 MCP 工具；
+- [x] MCP 工具暴露：`mcp_server.py` 用 FastMCP 把 6 个工具暴露为标准 MCP 工具（已做 stdio 真实冒烟）；
 - [x] 意图识别：可选 LLM（本地 Ollama / 云端千问·智谱），失败自动回退确定性规则；
 - [x] BOM `.xlsx` / `.xlsm` / `.csv` 解析；
 - [x] Markdown 业务规则分块与离线检索；
@@ -65,7 +65,8 @@
 - [x] 订单与审计查看页面；
 - [x] Windows `.cmd` 一键启动；
 - [x] PowerShell `.ps1` 备用启动；
-- [x] Docker API 镜像、UI 镜像与 Compose 编排；
+- [x] Docker API 镜像、UI 镜像与 Compose 编排（已真实构建 + 容器端到端冒烟 8/8 通过）；
+- [x] `.dockerignore`：阻止 `.env`、`data/*.db`、内部资料进入镜像；
 - [x] README；
 - [x] 3 分钟面试演示脚本；
 - [x] 离职前三天现场信息采集清单。
@@ -90,6 +91,13 @@
 | 2026-09-07 | 工具调用循环真实冒烟（智谱 glm-4-flash） | 通过：模型自主调用 create_purchase_order 生成 ¥24164 草稿并停下等确认 |
 | 2026-09-07 | 多轮对话确认写入 | 通过：第二轮模型调 confirm_commit 写入 PO-DEMO-20260907-* |
 | 2026-09-07 | 全量测试 | 34/34 通过 |
+| 2026-09-09 | MCP stdio 真实冒烟（`smoke_mcp.py`） | 通过：6 个工具全部经 MCP 协议暴露，`detect_material_errors` 调用成功 |
+| 2026-09-09 | `docker compose build`（api + ui 双镜像） | 通过：3 分 31 秒构建成功（`python:3.13-slim`） |
+| 2026-09-09 | 容器端到端冒烟（`smoke_docker.py`） | 通过：8/8，含 `/agent/prepare` 六步流水线（¥24164）与 `/agent/detect`（3 行检出 3 错误） |
+| 2026-09-09 | Compose 内部服务名互通 | 通过：UI 容器访问 `http://api:8000/health` 返回 200 |
+| 2026-09-09 | 数据卷持久化 | 通过：`docker compose restart api` 后 error_reports 数据仍在 |
+| 2026-09-09 | 镜像安全扫描 | 通过：镜像内无 `.env`、无明文密钥，`knowledge/` 三份规则文档完整 |
+| 2026-09-09 | 全量测试 | 48/48 通过 |
 
 ## 5. 已遇到并解决的问题
 
@@ -156,7 +164,7 @@
 - [ ] 增加采购 PO 导出 Excel/PDF；
 - [ ] 录制演示视频并制作项目架构图；
 - [ ] 整理简历 bullet、项目复盘和面试问答；
-- [ ] 执行完整 Docker 构建与容器运行测试，目前仅验证 Compose 配置。
+- [x] 执行完整 Docker 构建与容器运行测试（2026-09-09 完成：真实构建 + 8/8 容器冒烟 + 持久化与安全扫描）。
 
 ## 7. 已知边界与风险
 
@@ -168,7 +176,7 @@
 | 重复建单 | `action_id` 唯一约束与幂等返回 | 对接真实 ERP 时传递幂等键 |
 | RAG 能力被夸大 | 当前明确标注为轻量本地检索 | 升级向量检索后再更新描述 |
 | 业务规则不准确 | 当前规则均为合成演示规则 | 离职前只验证抽象规则，不复制真实数据 |
-| Docker 尚未完整运行 | 已通过 Compose 配置检查 | 后续完成镜像构建和端到端容器测试 |
+| Docker 镜像体积与拉取 | 已真实构建并跑通；网络受限时在 `~/.docker/daemon.json` 配 `registry-mirrors` | 换网络环境时可调整镜像加速器 |
 
 ## 8. 关键决策记录
 
@@ -208,6 +216,16 @@
 ```
 
 ## 11. 工作日志
+
+### 2026-09-09 09:55
+
+- 本次目标：清掉两个"未验证"遗留项——MCP stdio 真实冒烟 + Docker 真实构建与容器端到端验证。
+- 实际完成：新增 `smoke_mcp.py`（MCP stdio 客户端冒烟，可复用）；新增 `smoke_docker.py`（Compose 容器冒烟，覆盖健康检查、核心端点、容器内业务链路、UI 健康）；新增 `.dockerignore`；`api.py` + `models.py` 补齐 `POST /agent/detect` 端点（此前物料错误检测只有 MCP/对话入口，无 REST 入口）；配置 Docker 镜像加速器后完成真实构建。
+- 改动文件：`smoke_mcp.py`（新增）、`smoke_docker.py`（新增）、`.dockerignore`（新增）、`api.py`、`erp_agent/models.py`、本文件。
+- 验证命令与结果：`python smoke_mcp.py` → 6 工具全部暴露、MCP 调用成功；`docker compose build` → 双镜像构建成功（3m31s）；`python smoke_docker.py` → 8/8 通过（六步流水线 ¥24164 / 物料错误检测 3 行检出 3 错误 / UI 健康）；`docker compose exec -T ui python -c ...` → UI 容器访问 `http://api:8000/health` 200；`docker compose restart api` 后 error_reports 仍在 → 数据卷持久化 OK；镜像内无 `.env`、无明文密钥、`knowledge/` 三份规则文档完整；`unittest discover` 48/48 OK。
+- 遇到的问题：① 首次构建失败于拉取 `python:3.13-slim`（直连 Docker Hub 超时）——根因是代理只监听 `127.0.0.1:7897`，WSL2 经 NAT 访问不到；解法是改在 `~/.docker/daemon.json` 配置 `registry-mirrors`（`docker.1panel.live` / `docker.m.daocloud.io` / `hub.rat.dev`），daemon 走国内站点直连，绕开代理。② `.dockerignore` 初版写了 `*.md`，会连带过滤 `knowledge/` 下的规则文档导致 Agent 规则检索失效，已改为 `/*.md` 只匹配根目录。③ 冒烟脚本臆造了 `/agent/detect` 端点与 `blocking_count` 字段，实测后改为真实字段并补齐端点。
+- 遗留问题：UI 端（Streamlit 界面）的真实点击演示仍未人工验证；演示录屏/截图未做。
+- 下一步第一动作：同步改动到发布副本并 push GitHub，确认 CI 与容器构建均绿。
 
 ### 2026-09-08 14:08
 
