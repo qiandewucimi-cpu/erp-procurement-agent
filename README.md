@@ -37,7 +37,7 @@ flowchart TB
     CC --> DB
     RB --> DB
     SK --> KB[(Markdown 规则库)]
-    MCP[MCP Server<br/>mcp_server.py] -.->|暴露 5 个标准工具| EXT[任意 MCP 客户端]
+    MCP[MCP Server<br/>mcp_server.py] -.->|暴露 7 个标准工具| EXT[任意 MCP 客户端]
 ```
 
 核心设计是「受控工具调用 Agent」：模型通过 Function Calling 自主决定调用哪个工具、传什么参数、调用顺序与次数，因此具备 agent 的多轮、自主编排能力；但**金额计算、业务校验和写入口令始终由确定性代码完成**，模型只做编排不做决定。断网或模型幻觉都不会造成错误写入。
@@ -94,7 +94,7 @@ python smoke_docker.py
 > ```
 > 注意：给 daemon 配代理通常无效，因为代理软件一般只监听 `127.0.0.1`，WSL2 经 NAT 访问不到。
 
-MCP 工具也可单独验证（stdio 协议，6 个工具）：
+MCP 工具也可单独验证（stdio 协议，7 个工具）：
 
 ```powershell
 python smoke_mcp.py
@@ -171,11 +171,11 @@ LLM_MODEL=qwen2.5:7b
 | GET | `/orders` | 查看模拟 ERP 单据 |
 | GET | `/audit` | 查看审计日志 |
 
-另有 `mcp_server.py`：把 5 个工具暴露为标准 MCP 工具，可接入任意 MCP 客户端（Claude Desktop、Cursor 等）。
+另有 `mcp_server.py`：把 7 个工具暴露为标准 MCP 工具，可接入任意 MCP 客户端（Claude Desktop、Cursor 等）。
 
 ## 六、代码阅读顺序
 
-1. `erp_agent/tools.py`：5 个业务工具的 schema 与确定性实现（金额/校验/口令都在这里）。
+1. `erp_agent/tools.py`：7 个业务工具的 schema 与确定性实现（金额/校验/口令都在这里）。
 2. `erp_agent/llm.py`：`AgentLoop` 工具调用循环 + `IntentClassifier` 意图识别。
 3. `erp_agent/agent.py`：`chat()` 多轮入口 + `prepare()` 兼容流水线。
 4. `erp_agent/parser.py`：BOM 文件解析。
