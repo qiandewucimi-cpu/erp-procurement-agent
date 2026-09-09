@@ -10,7 +10,7 @@
 
 项目当前进度、问题、缺口和下一步统一记录在 `PROJECT_STATUS.md`。每次实质改动结束前都应同步更新该文件。
 
-> 安全声明：项目不连接任何真实企业生产系统；供应商、合同、物料、价格和单号均为虚构数据。工作区中的公司资料不会被程序自动加载。
+> 安全声明：项目不连接任何真实企业生产系统；供应商、合同、物料、价格和单号均为虚构数据。程序只加载项目目录内的合成资料，不会读取其他位置的文件。
 
 ## 一、3 分钟能看到什么
 
@@ -33,9 +33,13 @@ flowchart TB
     LOOP --> CP[create_purchase_order<br/>生成草稿预览]
     LOOP --> CC[confirm_commit<br/>写入 · 需口令 · 幂等]
     LOOP --> RB[rollback_po<br/>回滚]
+    LOOP --> DM[detect_material_errors<br/>物料错误分级]
+    LOOP --> IM[import_materials<br/>物料档案导入]
     CP --> DB[(SQLite 模拟 ERP)]
     CC --> DB
     RB --> DB
+    DM --> DB
+    IM --> DB
     SK --> KB[(Markdown 规则库)]
     MCP[MCP Server<br/>mcp_server.py] -.->|暴露 7 个标准工具| EXT[任意 MCP 客户端]
 ```
@@ -123,14 +127,17 @@ python -m py_compile api.py ui.py erp_agent\*.py
 
 ### 能力评测（evals）
 
-项目内置评测集 `evals/`，用 15 个用例量化 Agent 能力，覆盖 7 个维度：金额正确性、异常识别与阻断、写操作安全边界、幂等写入、回滚可追溯、工具选择准确率、安全指令遵守率。
+项目内置评测集 `evals/`，覆盖金额正确性、异常识别与阻断、写操作安全边界、幂等写入、回滚可追溯、工具选择准确率、安全指令遵守率等维度。
 
 ```powershell
 python evals/run_eval.py --offline   # 确定性层，无需模型密钥（CI 使用）
 python evals/run_eval.py             # 全量，真实调用模型
 ```
 
-最近一次全量评测：**15/15 通过，准确率 100%**（含“只查询不得建单”等安全对抗用例）。完整报告见 `evals/REPORT.md`，随每次评测自动刷新。
+- CI 离线确定性层：**8/8 通过（100%）**；
+- 最近一次全量评测（含真实模型调用）：**15/15 通过**，含"只查询不得建单"等安全对抗用例。
+
+完整报告见 `evals/REPORT.md`，随每次评测自动刷新。
 
 ## 四·一、模型配置（工具调用循环）
 
@@ -178,12 +185,13 @@ LLM_MODEL=qwen2.5:7b
 1. `erp_agent/tools.py`：7 个业务工具的 schema 与确定性实现（金额/校验/口令都在这里）。
 2. `erp_agent/llm.py`：`AgentLoop` 工具调用循环 + `IntentClassifier` 意图识别。
 3. `erp_agent/agent.py`：`chat()` 多轮入口 + `prepare()` 兼容流水线。
-4. `erp_agent/parser.py`：BOM 文件解析。
+4. `erp_agent/parser.py`：BOM 与物料档案（.xlsx/.csv）解析、表头别名归一。
 5. `erp_agent/knowledge.py`：离线 RAG 检索和来源返回。
 6. `erp_agent/repository.py`：SQLite、预览、幂等、审计和回滚。
-7. `api.py`：FastAPI 接口。
-8. `mcp_server.py`：MCP 工具暴露。
-9. `ui.py`：Streamlit 聊天演示页。
+7. `erp_agent/validator.py`：物料错误检测的确定性校验与分级。
+8. `api.py`：FastAPI 接口。
+9. `mcp_server.py`：MCP 工具暴露。
+10. `ui.py`：Streamlit 聊天演示页。
 
 ## 七、项目边界与生产化路线
 

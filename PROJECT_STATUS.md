@@ -69,7 +69,7 @@
 - [x] Docker API 镜像、UI 镜像与 Compose 编排（已真实构建 + 容器端到端冒烟 8/8 通过）；
 - [x] `.dockerignore`：阻止 `.env`、`data/*.db`、内部资料进入镜像；
 - [x] README；
-- [x] 3 分钟面试演示脚本；
+- [x] 演示与定位文档（`docs/ui-demo.md` 演示验证记录；面试自用材料不随发布版公开）；
 
 ## 4. 验证记录
 
@@ -141,7 +141,7 @@
 
 ## 6. 当前缺口
 
-以下内容尚未完成，不能在面试中声称已经实现：
+以下内容尚未完成，请勿声称已经实现：
 
 ### 6.1 现场业务复核清单
 
@@ -165,7 +165,7 @@
 - [ ] 增加模拟 ERP Adapter 接口层，方便未来替换真实 API；
 - [ ] 增加采购 PO 导出 Excel/PDF；
 - [x] 录制演示视频并制作项目架构图（架构图 v3 已完成；UI 演示截图 4 张已于 2026-09-09 补充至 `docs/ui-demo/`，仅差可选录屏合成）；
-- [ ] 整理简历 bullet、项目复盘和面试问答；
+- [ ] 整理简历 bullet、项目复盘与问答材料；
 - [x] 执行完整 Docker 构建与容器运行测试（2026-09-09 完成：真实构建 + 8/8 容器冒烟 + 持久化与安全扫描）。
 
 ## 7. 已知边界与风险
@@ -199,7 +199,7 @@
 2. 根据页面实际体验修复 UI 或启动问题；
 3. 立即执行《现场业务信息采集清单》中的流程与字段复核；
 4. 把确认后的抽象业务规则反馈给项目，禁止直接提交真实业务数据；
-5. 更新知识库、校验器、测试和面试脚本；
+5. 更新知识库、校验器、测试与演示材料；
 6. 再加入 LLM 工具选择、RAG 评测和项目包装。
 
 ## 10. 接续工作检查模板
@@ -218,6 +218,15 @@
 ```
 
 ## 11. 工作日志
+
+### 2026-09-09 22:50
+
+- 本次目标：按"公开仓库=面试官第一印象"的要求，移除面试自用材料，并对仓库做面试官视角的全面审查与脱敏。
+- 实际完成：① 从发布版移除两份面试自用材料（源头工作区保留自用，不进发布版）；② README 优化：安全声明措辞中性化、"3 分钟能看到什么"补 import 演示、mermaid 架构图补齐 7 个工具节点（detect_material_errors + import_materials）、评测描述改为"CI 离线 8/8 + 最近一次全量 15/15"双行口径、代码阅读顺序扩为 10 条并补 `erp_agent/validator.py`；③ architecture.html 工具层升级为 7 个业务工具（新增 import_materials 节点）、端点列表补 `/materials/import` 与 `GET /materials`、验证横幅更新为"单测 58/58 · MCP 7 工具"；④ 全仓内部措辞中性化：README、`物料错误检测_设计说明.md`（痛点来源表述、定位口径）、PROJECT_STATUS（演示脚本）、docs/ui-demo.md（去掉对已删脚本的引用）。
+- 改动文件：`README.md`、`PROJECT_STATUS.md`、`architecture.html`、`docs/ui-demo.md`、`物料错误检测_设计说明.md`；删除两份面试自用材料。
+- 验证命令与结果：全仓敏感词扫描 0 命中（覆盖内部组织名与内部语境词）；本次仅文档与静态页改动，未触碰代码，58/58 测试与 8/8 离线评测仍有效。
+- 遇到的问题：PROJECT_STATUS 被 PowerShell 重写引入 BOM，已用 .NET 写回无 BOM UTF-8；git diff 确认无整文件噪声。
+- 遗留问题：源头工作区保留两份面试自用材料（有意差异，.dockerignore 已排除）；samples 两个 BOM 文件哈希与源头不同（内容逐行一致，仅为重新保存的元数据差异，不处理）。
 
 ### 2026-09-09 22:25
 
@@ -251,9 +260,9 @@
 
 ### 2026-09-08 14:08
 
-- 本次目标：把新工具 `detect_material_errors` 接入 MCP 暴露、FastAPI、Streamlit UI 和面试脚本，让演示可点出。
-- 实际完成：`api.py` 新增 `GET /error_reports`；`mcp_server.py` 新增 `detect_material_errors` MCP 工具；`ui.py` 欢迎语加物料错误检测示例、审计页加"物料错误报告（推送队列）"展示；`面试演示脚本.md` 补痛点陈述 + 检测演示段 + 推送落地追问；`architecture.html` 升级 v2（6 工具 + error_reports + MCP 复用说明）。
-- 改动文件：`api.py`、`mcp_server.py`、`ui.py`、`面试演示脚本.md`、`architecture.html`、本文件。
+- 本次目标：把新工具 `detect_material_errors` 接入 MCP 暴露、FastAPI、Streamlit UI 和演示脚本，让演示可点出。
+- 实际完成：`api.py` 新增 `GET /error_reports`；`mcp_server.py` 新增 `detect_material_errors` MCP 工具；`ui.py` 欢迎语加物料错误检测示例、审计页加"物料错误报告（推送队列）"展示；`演示脚本.md` 补痛点陈述 + 检测演示段 + 推送落地追问；`architecture.html` 升级 v2（6 工具 + error_reports + MCP 复用说明）。
+- 改动文件：`api.py`、`mcp_server.py`、`ui.py`、`演示脚本.md`、`architecture.html`、本文件。
 - 验证命令与结果：`.venv/Scripts/python.exe -m py_compile api.py ui.py mcp_server.py erp_agent/*.py` 通过；`unittest discover` 48/48 OK；工具层 + API 层冒烟：detect 检出 3 错误、push 落库 1 条、`/health` `/error_reports` `/samples` 均 200。
 - 遇到的问题：冒烟脚本误传 str 给 KnowledgeBase（需 Path），已修正。
 - 遗留问题：mcp_server.py 尚未做 stdio 真实冒烟（mcp 包依赖）；Docker 仍未真实构建。
@@ -262,12 +271,12 @@
 ### 2026-09-08 11:58
 
 - 本次目标：回应用户"demo 用途不清"的焦虑，落地第二个业务工具「物料错误检测」，让项目从单流程变有真实痛点支撑的方案。
-- 实际完成：新增 `erp_agent/validator.py`（`MaterialValidator` 单行校验 7 类错误 + `MaterialAuditor` 批量审计/报告/推送文本）；`tools.py` 新增 `detect_material_errors` 工具（min_level 过滤 + push 落库）；`repository.py` 新增 `error_reports` 表（outbox 模式）+ `save_error_report` + `error_reports`；新增 `tests/test_material_errors.py`（14 用例）；新增知识库 `物料错误检测规则.md`；另产架构图 `architecture.html` 与 `用途定位与面试话术.md`、`物料错误检测_设计说明.md`。
-- 改动文件：`erp_agent/validator.py`（新增）、`erp_agent/tools.py`、`erp_agent/repository.py`、`tests/test_material_errors.py`（新增）、`knowledge/物料错误检测规则.md`（新增）、`architecture.html`、`用途定位与面试话术.md`、`物料错误检测_设计说明.md`、本文件。
+- 实际完成：新增 `erp_agent/validator.py`（`MaterialValidator` 单行校验 7 类错误 + `MaterialAuditor` 批量审计/报告/推送文本）；`tools.py` 新增 `detect_material_errors` 工具（min_level 过滤 + push 落库）；`repository.py` 新增 `error_reports` 表（outbox 模式）+ `save_error_report` + `error_reports`；新增 `tests/test_material_errors.py`（14 用例）；新增知识库 `物料错误检测规则.md`；另产架构图 `architecture.html`、定位说明文档与 `物料错误检测_设计说明.md`。
+- 改动文件：`erp_agent/validator.py`（新增）、`erp_agent/tools.py`、`erp_agent/repository.py`、`tests/test_material_errors.py`（新增）、`knowledge/物料错误检测规则.md`（新增）、`architecture.html`、`物料错误检测_设计说明.md`、本文件。
 - 验证命令与结果：`.venv/Scripts/python.exe -m unittest discover -s tests -v` → 48/48 OK（原 34 个零回归，新增 14 个）。
 - 遇到的问题：无。
 - 遗留问题：`detect_material_errors` 尚未接入 MCP 暴露与 Streamlit UI；`create_purchase_order` 的校验逻辑仍未切到 validator（可复用但为保稳定未动）；真实推送 webhook/定时任务未接。
-- 下一步第一动作：把新工具暴露到 MCP 与 UI，并在面试脚本里加一段"物料错误自动推送"演示。
+- 下一步第一动作：把新工具暴露到 MCP 与 UI，并在演示脚本里加一段"物料错误自动推送"演示。
 
 ### 2026-09-07 22:50
 

@@ -95,8 +95,8 @@
         <rect x="360" y="200" width="400" height="74" rx="8" fill="#ccfbf1" stroke="#14b8a6" stroke-width="2" />
       </g>
       <text x="560" y="226" text-anchor="middle" class="box-title">FastAPI Agent API</text>
-      <text x="560" y="246" text-anchor="middle" class="box-sub">POST /agent/chat · /prepare · /detect · /confirm · /rollback</text>
-      <text x="560" y="264" text-anchor="middle" class="box-sub">GET /orders · /audit · /error_reports · /health</text>
+      <text x="560" y="246" text-anchor="middle" class="box-sub">POST /agent/chat · /prepare · /detect · /confirm · /rollback · /materials/import</text>
+      <text x="560" y="264" text-anchor="middle" class="box-sub">GET /materials · /orders · /audit · /error_reports · /health</text>
 
       <g filter="url(#shadow)">
         <rect x="340" y="312" width="440" height="56" rx="8" fill="#fef3c7" stroke="#f59e0b" stroke-width="2" />
@@ -104,54 +104,57 @@
       <text x="560" y="334" text-anchor="middle" class="box-title">工具调用循环 AgentLoop（Function Calling）</text>
       <text x="560" y="354" text-anchor="middle" class="box-sub">IntentClassifier 意图识别：LLM 可选，失败回退确定性规则</text>
 
-      <text x="105" y="400" class="layer-label">工具层 (6 个业务工具)</text>
+      <text x="105" y="400" class="layer-label">工具层 (7 个业务工具)</text>
 
       <g filter="url(#shadow)">
-        <rect x="105" y="408" width="140" height="78" rx="8" fill="#fce7f3" stroke="#ec4899" stroke-width="2" />
+        <rect x="105" y="408" width="120" height="78" rx="8" fill="#fce7f3" stroke="#ec4899" stroke-width="2" />
       </g>
-      <text x="175" y="434" text-anchor="middle" class="box-sub" font-weight="700">search_</text>
-      <text x="175" y="449" text-anchor="middle" class="box-sub" font-weight="700">knowledge</text>
-      <text x="175" y="470" text-anchor="middle" class="box-sub">规则检索</text>
+      <text x="165" y="434" text-anchor="middle" class="box-sub" font-weight="700">search_</text>
+      <text x="165" y="449" text-anchor="middle" class="box-sub" font-weight="700">knowledge</text>
+      <text x="165" y="470" text-anchor="middle" class="box-sub">规则检索</text>
 
       <g filter="url(#shadow)">
-        <rect x="259" y="408" width="140" height="78" rx="8" fill="#fce7f3" stroke="#ec4899" stroke-width="2" />
+        <rect x="249" y="408" width="120" height="78" rx="8" fill="#fce7f3" stroke="#ec4899" stroke-width="2" />
       </g>
-      <text x="329" y="434" text-anchor="middle" class="box-sub" font-weight="700">query_</text>
-      <text x="329" y="449" text-anchor="middle" class="box-sub" font-weight="700">materials</text>
-      <text x="329" y="470" text-anchor="middle" class="box-sub">物料查询(只读)</text>
+      <text x="309" y="434" text-anchor="middle" class="box-sub" font-weight="700">query_</text>
+      <text x="309" y="449" text-anchor="middle" class="box-sub" font-weight="700">materials</text>
+      <text x="309" y="470" text-anchor="middle" class="box-sub">物料查询(只读)</text>
 
       <g filter="url(#shadow)">
-        <rect x="413" y="408" width="140" height="78" rx="8" fill="#fce7f3" stroke="#ec4899" stroke-width="2" />
+        <rect x="393" y="408" width="120" height="78" rx="8" fill="#fce7f3" stroke="#ec4899" stroke-width="2" />
       </g>
-      <text x="483" y="434" text-anchor="middle" class="box-sub" font-weight="700">create_</text>
-      <text x="483" y="449" text-anchor="middle" class="box-sub" font-weight="700">purchase_order</text>
-      <text x="483" y="470" text-anchor="middle" class="box-sub">生成草稿(预览)</text>
+      <text x="453" y="434" text-anchor="middle" class="box-sub" font-weight="700">create_</text>
+      <text x="453" y="449" text-anchor="middle" class="box-sub" font-weight="700">purchase_order</text>
+      <text x="453" y="470" text-anchor="middle" class="box-sub">生成草稿(预览)</text>
 
       <g filter="url(#shadow)">
-        <rect x="567" y="408" width="140" height="78" rx="8" fill="#fce7f3" stroke="#ec4899" stroke-width="2" />
+        <rect x="537" y="408" width="120" height="78" rx="8" fill="#fce7f3" stroke="#ec4899" stroke-width="2" />
       </g>
-      <text x="637" y="434" text-anchor="middle" class="box-sub" font-weight="700">confirm_</text>
-      <text x="637" y="449" text-anchor="middle" class="box-sub" font-weight="700">commit</text>
-      <text x="637" y="470" text-anchor="middle" class="box-sub">确认写入</text>
+      <text x="597" y="434" text-anchor="middle" class="box-sub" font-weight="700">confirm_</text>
+      <text x="597" y="449" text-anchor="middle" class="box-sub" font-weight="700">commit</text>
+      <text x="597" y="470" text-anchor="middle" class="box-sub">确认写入</text>
 
       <g filter="url(#shadow)">
-        <rect x="721" y="408" width="140" height="78" rx="8" fill="#fce7f3" stroke="#ec4899" stroke-width="2" />
+        <rect x="681" y="408" width="120" height="78" rx="8" fill="#fce7f3" stroke="#ec4899" stroke-width="2" />
       </g>
-      <text x="791" y="434" text-anchor="middle" class="box-sub" font-weight="700">rollback_</text>
-      <text x="791" y="449" text-anchor="middle" class="box-sub" font-weight="700">po</text>
-      <text x="791" y="470" text-anchor="middle" class="box-sub">回滚</text>
+      <text x="741" y="434" text-anchor="middle" class="box-sub" font-weight="700">rollback_</text>
+      <text x="741" y="449" text-anchor="middle" class="box-sub" font-weight="700">po</text>
+      <text x="741" y="470" text-anchor="middle" class="box-sub">回滚</text>
 
       <g filter="url(#shadow)">
-        <rect x="875" y="408" width="140" height="78" rx="8" fill="#ede9fe" stroke="#8b5cf6" stroke-width="2" />
+        <rect x="825" y="408" width="120" height="78" rx="8" fill="#ede9fe" stroke="#8b5cf6" stroke-width="2" />
       </g>
-      <text x="945" y="434" text-anchor="middle" class="box-sub" font-weight="700">detect_material_</text>
-      <text x="945" y="449" text-anchor="middle" class="box-sub" font-weight="700">errors</text>
-      <text x="945" y="470" text-anchor="middle" class="box-sub">物料错误检测</text>
+      <text x="885" y="434" text-anchor="middle" class="box-sub" font-weight="700">detect_material_</text>
+      <text x="885" y="449" text-anchor="middle" class="box-sub" font-weight="700">errors</text>
+      <text x="885" y="470" text-anchor="middle" class="box-sub">物料错误检测</text>
 
-      <text x="105" y="504" class="layer-label">数据 &amp; 知识层</text>
       <g filter="url(#shadow)">
-        <rect x="105" y="512" width="300" height="64" rx="8" fill="#ffe4e6" stroke="#f43f5e" stroke-width="2" />
+        <rect x="969" y="408" width="120" height="78" rx="8" fill="#ede9fe" stroke="#8b5cf6" stroke-width="2" />
       </g>
+      <text x="1029" y="434" text-anchor="middle" class="box-sub" font-weight="700">import_</text>
+      <text x="1029" y="449" text-anchor="middle" class="box-sub" font-weight="700">materials</text>
+      <text x="1029" y="470" text-anchor="middle" class="box-sub">物料档案导入</text>
+
       <text x="255" y="538" text-anchor="middle" class="box-title">Markdown 规则库</text>
       <text x="255" y="558" text-anchor="middle" class="box-sub">RAG 离线检索 + 来源返回</text>
 
@@ -165,7 +168,7 @@
       <g filter="url(#shadow)">
         <rect x="105" y="620" width="400" height="48" rx="8" fill="#ede9fe" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="6 4" />
       </g>
-      <text x="305" y="646" text-anchor="middle" class="box-sub" font-weight="700">MCP Server（FastMCP）· 复用同一套 6 个工具</text>
+      <text x="305" y="646" text-anchor="middle" class="box-sub" font-weight="700">MCP Server（FastMCP）· 复用同一套 7 个工具</text>
 
       <g filter="url(#shadow)">
         <rect x="620" y="620" width="395" height="48" rx="8" fill="#ede9fe" stroke="#8b5cf6" stroke-width="2" />
@@ -206,7 +209,7 @@
         <rect x="105" y="912" width="910" height="48" rx="10" fill="#ecfdf5" stroke="#059669" stroke-width="2" />
       </g>
       <text x="560" y="941" text-anchor="middle" class="box-sub" font-weight="700">
-        ✅ 已验证：容器端到端冒烟 8/8 ｜ MCP stdio 6 工具 ｜ 镜像内无 .env 与明文密钥 ｜ 数据卷持久化 ｜ 单测 48/48 ｜ CI 双 Python 版本
+        ✅ 已验证：容器端到端冒烟 8/8 ｜ MCP stdio 7 工具 ｜ 镜像内无 .env 与明文密钥 ｜ 数据卷持久化 ｜ 单测 58/58 ｜ CI 双 Python 版本
       </text>
 
       <g transform="translate(105,978)">
