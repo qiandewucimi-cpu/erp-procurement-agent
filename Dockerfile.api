@@ -7,7 +7,7 @@ COPY erp_agent ./erp_agent
 COPY knowledge ./knowledge
 COPY samples ./samples
 COPY api.py .
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data /app/uploads
 
 EXPOSE 8000
 CMD ["python", "-m", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .knowledge import KnowledgeBase
 from .models import ValidationIssue
-from .parser import parse_bom
+from .parser import parse_bom, parse_materials
 from .repository import ERPRepository
 from .validator import MaterialAuditor
 
@@ -21,11 +21,65 @@ class ToolRegistry:
     模型能自主决定的是：调用哪个工具、传什么参数、调用顺序与次数。
     """
 
-    def __init__(self, repository: ERPRepository, knowledge: KnowledgeBase, samples_dir: Path):
+    def __init__(
+        self,
+        repository: ERPRepository,
+        knowledge: KnowledgeBase,
+        samples_dir: Path,
+        uploads_dir: Path | None = None,
+    ):
         self.repository = repository
         self.knowledge = knowledge
-        self.samples_dir = samples_dir
+        self.samples_dir = Path(samples_dir)
+        # 用户上传目录：默认与 samples 同级，可通过参数覆盖（容器/测试场景）
+        self.uploads_dir = Path(uploads_dir) if uploads_dir else self.samples_dir.parent / "uploads"
         self.auditor = MaterialAuditor(repository)
+
+    def resolve_bom_file(self, filename: str) -> Path:
+        """在 samples/ 与 uploads/ 两个白名单目录内解析 BOM 文件。
+
+        安全约束（与仅读 samples 时同强度）：
+        - 先用 Path(filename).name 剥离一切目录成分，杜绝 ../ 穿越；
+        - 再逐个白名单目录比对解析后的父目录，越权一律拒绝。
+        """
+        name = Path(filename).name
+        if not name:
+            raise FileNotFoundError("文件名不能为空")
+
+        # 1) 精确匹配
+        for base in (self.samples_dir, self.uploads_dir):
+            base_resolved = base.resolve()
+            candidate = (base / name).resolve()
+            if candidate.parent == base_resolved and candidate.exists():
+                return candidate
+
+        # 2) 容错匹配：模型常把「我的BOM.xlsx」缩成「BOM.xlsx」，
+        #    或把「2026年3月BOM」说成「BOM」。这里只在白名单目录内做包含匹配，
+        #    不解析任何用户传入的路径，安全性不变。
+        stem = Path(name).stem.lower()
+        if stem:
+            # 用户上传的优先于内置示例
+            for base in (self.uploads_dir, self.samples_dir):
+                if not base.exists():
+                    continue
+                matches = [
+                    f for f in base.iterdir() if f.is_file() and stem in f.stem.lower()
+                ]
+                if len(matches) == 1:
+                    return matches[0].resolve()
+                if len(matches) > 1:
+                    exact = [f for f in matches if f.stem.lower() == stem]
+                    if len(exact) == 1:
+                        return exact[0].resolve()
+                    names = "、".join(sorted(m.name for m in matches))
+                    raise FileNotFoundError(
+                        f"文件名「{name}」匹配到多个文件（{names}），请使用更完整的文件名"
+                    )
+
+        raise FileNotFoundError(
+            f"找不到 BOM 文件「{name}」：已查询 samples/ 与 uploads/ 两个目录。"
+            f"若使用自己的文件，请先上传。"
+        )
 
     # ------------------------------------------------------------------ #
     # 工具 schema（OpenAI function-calling 格式，模型靠它理解工具）
@@ -127,6 +181,20 @@ class ToolRegistry:
                     },
                 },
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "import_material_master",
+                    "description": "把用户的物料档案表（Excel/CSV）导入模拟 ERP 的物料主数据，已存在的编码则更新价格。导入自己的档案后，再用自己的 BOM 才不会被判为「未建档」。",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "filename": {"type": "string", "description": "物料档案文件名，如「物料档案模板.xlsx」"},
+                        },
+                        "required": ["filename"],
+                    },
+                },
+            },
         ]
 
     # ------------------------------------------------------------------ #
@@ -140,6 +208,7 @@ class ToolRegistry:
             "confirm_commit": self._confirm_commit,
             "rollback_po": self._rollback_po,
             "detect_material_errors": self._detect_material_errors,
+            "import_material_master": self._import_material_master,
         }.get(name)
         if handler is None:
             return json.dumps({"ok": False, "error": f"未知工具：{name}"}, ensure_ascii=False)
@@ -181,9 +250,10 @@ class ToolRegistry:
 
     def _create_purchase_order(self, args: dict) -> str:
         filename = str(args.get("filename", ""))
-        source_path = (self.samples_dir / Path(filename).name).resolve()
-        if source_path.parent != self.samples_dir.resolve() or not source_path.exists():
-            return json.dumps({"ok": False, "error": f"文件不存在：{filename}，可用示例见 /samples 接口"}, ensure_ascii=False)
+        try:
+            source_path = self.resolve_bom_file(filename)
+        except FileNotFoundError as exc:
+            return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
 
         content = source_path.read_bytes()
         rows = parse_bom(source_path.name, content)
@@ -287,9 +357,10 @@ class ToolRegistry:
         filename = str(args.get("filename", ""))
         min_level = str(args.get("min_level", "warning"))
         push = bool(args.get("push", False))
-        source_path = (self.samples_dir / Path(filename).name).resolve()
-        if source_path.parent != self.samples_dir.resolve() or not source_path.exists():
-            return json.dumps({"ok": False, "error": f"文件不存在：{filename}，可用示例见 /samples 接口"}, ensure_ascii=False)
+        try:
+            source_path = self.resolve_bom_file(filename)
+        except FileNotFoundError as exc:
+            return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
         try:
             rows = parse_bom(source_path.name, source_path.read_bytes())
         except Exception as exc:
@@ -307,6 +378,39 @@ class ToolRegistry:
                 "summary": report["summary"],
                 "errors": report["errors"],
                 "push_text": report["push_text"],
+            },
+            ensure_ascii=False,
+        )
+
+    def _import_material_master(self, args: dict) -> str:
+        filename = str(args.get("filename", ""))
+        try:
+            source_path = self.resolve_bom_file(filename)
+        except FileNotFoundError as exc:
+            return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
+        try:
+            rows = parse_materials(source_path.name, source_path.read_bytes())
+        except Exception as exc:
+            return json.dumps({"ok": False, "error": f"解析失败：{exc}"}, ensure_ascii=False)
+        if not rows:
+            return json.dumps({"ok": False, "error": "没有解析到任何物料行"}, ensure_ascii=False)
+
+        result = self.repository.import_materials(rows)
+        total = result["imported"] + result["updated"]
+        summary_text = (
+            f"物料档案导入完成：共读取 {len(rows)} 行，"
+            f"新增 {result['imported']} 条、更新 {result['updated']} 条"
+            + (f"，跳过 {len(result['skipped'])} 行" if result["skipped"] else "")
+        )
+        return json.dumps(
+            {
+                "ok": True,
+                "source_file": source_path.name,
+                "total_rows": len(rows),
+                "imported": result["imported"],
+                "updated": result["updated"],
+                "skipped": result["skipped"],
+                "summary_text": summary_text,
             },
             ensure_ascii=False,
         )

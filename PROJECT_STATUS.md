@@ -8,7 +8,7 @@
 
 | 项目 | 当前状态 |
 |---|---|
-| 最后更新时间 | 2026-09-09 22:11（Asia/Shanghai） |
+| 最后更新时间 | 2026-09-09 22:25（Asia/Shanghai） |
 | 当前版本 | v0.3 工具调用循环 Agent（Function Calling + 多轮对话 + MCP） |
 | 当前阶段 | 核心闭环 + UI 真实点击演示均已完成（截图入作品集）；剩余现场业务规则复核 |
 | 主业务场景 | BOM → 采购 PO |
@@ -44,6 +44,7 @@
 - [x] Markdown 业务规则分块与离线检索；
 - [x] 可展示来源、章节、摘要和检索分数；
 - [x] SQLite 模拟 ERP 物料档案；
+- [x] 物料档案导入（`POST /materials/import` + MCP `import_materials` + UI 上传入口，白名单目录解析防路径穿越，模板见 `samples/物料档案模板.xlsx`）；
 - [x] 供应商、单价、包装费和币种查询；
 - [x] 采购 PO 草稿生成及总金额计算；
 - [x] 必填、数量、档案、名称、供应商和币种校验；
@@ -99,6 +100,7 @@
 | 2026-09-09 | 镜像安全扫描 | 通过：镜像内无 `.env`、无明文密钥，`knowledge/` 三份规则文档完整 |
 | 2026-09-09 | 全量测试 | 48/48 通过 |
 | 2026-09-09 | **Streamlit UI 真实点击演示（浏览器实测）** | 通过：① 模型自主调用 `detect_material_errors`（3 行 3 错误，阻断 2 / 警告 1）、`create_purchase_order`（¥24164）、`confirm_commit`（PO-DEMO-20260909-6E25）三个工具并展示轨迹；② "订单与审计"页三张表全部渲染（采购 PO / 审计日志 5 条 / 错误报告队列 PENDING_PUSH）。截图见 `docs/ui-demo/`，记录见 `docs/ui-demo.md` |
+| 2026-09-09 | 物料档案导入功能（工作区已完成，本次从源头同步至发布副本） | 通过：`unittest` 58/58 OK（含新增 `tests/test_material_import.py`），evals offline 8/8 100%；同时修正 `test_material_errors` 缺失文件断言以匹配 `resolve_bom_file` 新报错文案 |
 
 ## 5. 已遇到并解决的问题
 
@@ -217,6 +219,16 @@
 ```
 
 ## 11. 工作日志
+
+### 2026-09-09 22:25
+
+- 本次目标：检查源头项目 `erp_agent_assistant` 与发布副本 `erp-procurement-agent` 的同步状态，发现并消除差异。
+- 实际完成：源头含 034227b 全部内容 + **物料档案导入功能**（工作区已完成但从未同步到发布副本/GitHub）：`POST /materials/import`（api.py）、导入 UI（ui.py "📇 导入自己的物料档案"）、MCP `import_materials`（mcp_server.py）、`parse_materials`（parser.py）、`import_materials`（repository.py）、`resolve_bom_file` 白名单路径解析 + `import_materials` 工具（tools.py）、`MaterialImportRequest`（models.py）、`tests/test_material_import.py`、`samples/物料档案模板.xlsx`、`generate_samples.py` 模板生成、Dockerfile api/ui 建 uploads 目录与 COPY samples、.gitignore/.dockerignore 排除 uploads、compose 增加 uploads 卷与可选 env_file。已全部同步到发布副本；修正 `test_material_errors` 缺失文件断言（旧文案"文件不存在"→ 新实现"找不到 BOM 文件"）。反向回同步 `docs/ui-demo`（截图+记录）到源头。
+- 改动文件：副本新增/更新 16 项（见 git log）；源头回同步 docs/ui-demo、PROJECT_STATUS、test_material_errors.py、evals/REPORT.md。
+- 验证命令与结果：`unittest discover` 58/58 OK；`py_compile` OK；`evals/run_eval.py --offline` 8/8 100%。
+- 遇到的问题：① 副本系统 Python（3.14.7）缺依赖，改用源头 `.venv` 跑测试；② 发现源头加物料导入后测试未同步（`test_tool_missing_file` 断言旧文案），已修正并回同步源头。
+- 遗留问题：无（发布副本与源头已对齐）。
+- 下一步第一动作：推送发布副本到 GitHub，确认 CI 全绿。
 
 ### 2026-09-09 22:11
 

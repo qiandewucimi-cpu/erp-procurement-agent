@@ -9,6 +9,7 @@ from erp_agent.models import (
     ChatRequest,
     ConfirmRequest,
     DetectRequest,
+    MaterialImportRequest,
     PrepareRequest,
     PrepareResponse,
     RollbackRequest,
@@ -43,6 +44,19 @@ def health() -> dict:
 def materials() -> list[dict]:
     """列出模拟 ERP 的物料档案（编码、名称、供应商、单价、包装费、币种）。"""
     return repository.materials()
+
+
+@app.post("/materials/import")
+def import_materials(request: MaterialImportRequest) -> dict:
+    """导入用户自己的物料档案到模拟 ERP（已存在的编码则更新价格）。
+
+    导入后，用户自己的 BOM 才能被正确匹配，否则会全部判为「未建档」而阻断。
+    """
+    raw = agent.tools.call("import_material_master", {"filename": request.filename})
+    result = json.loads(raw)
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "物料档案导入失败"))
+    return result
 
 
 @app.get("/samples")

@@ -68,6 +68,37 @@ def render_trace(trace: list[dict]) -> None:
 
 
 with tab_chat:
+    # ---------------- 导入自己的物料档案 ----------------
+    with st.expander("📇 导入自己的物料档案（.xlsx / .xlsm / .csv）", expanded=False):
+        st.caption(
+            "先把你自己的物料主数据导入模拟 ERP，之后用你自己的 BOM 才不会被判为「未建档」。"
+            "必需列：**物料编码**、**单价**；可选列：物料名称、供应商编码、供应商名称、包装费、币种。"
+            "同一个编码再次导入会**更新**价格。"
+        )
+        tpl = Path("samples/物料档案模板.xlsx")
+        if tpl.exists():
+            st.download_button(
+                "⬇️ 下载物料档案模板",
+                data=tpl.read_bytes(),
+                file_name="物料档案模板.xlsx",
+                key="dl_tpl",
+            )
+        master_file = st.file_uploader("选择物料档案文件", type=["xlsx", "xlsm", "csv"], key="master_upload")
+        if master_file is not None:
+            safe_name = Path(master_file.name).name  # 剥离任何目录成分
+            UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+            (UPLOADS_DIR / safe_name).write_bytes(master_file.getbuffer())
+            if st.button(f"导入 `{safe_name}` 到模拟 ERP", key="do_import_master"):
+                try:
+                    res = api("POST", "/materials/import", json={"filename": safe_name})
+                    st.success(res.get("summary_text", "导入完成"))
+                    if res.get("skipped"):
+                        st.warning(f"有 {len(res['skipped'])} 行被跳过：")
+                        st.dataframe(pd.DataFrame(res["skipped"]), use_container_width=True, hide_index=True)
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"导入失败：{exc}")
+
     # ---------------- 导入自己的 BOM ----------------
     with st.expander("📤 导入自己的 BOM（.xlsx / .xlsm / .csv）", expanded=False):
         st.caption(

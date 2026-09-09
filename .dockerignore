@@ -17,6 +17,9 @@ __pycache__/
 data/*.db
 data/*.db-journal
 
+# 用户上传的 BOM，由 volume 挂载提供
+uploads/
+
 # 测试、覆盖率与评测产物
 tests/
 evals/

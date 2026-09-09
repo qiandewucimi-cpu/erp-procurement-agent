@@ -83,9 +83,8 @@ class PurchasePOAgent:
             content = base64.b64decode(content_base64)
             source = filename
         else:
-            source_path = (self.samples_dir / Path(filename).name).resolve()
-            if source_path.parent != self.samples_dir.resolve() or not source_path.exists():
-                raise FileNotFoundError("示例文件不存在")
+            # 复用工具层的白名单解析（samples/ 与 uploads/），否则用户上传的 BOM 走不了 prepare
+            source_path = self.tools.resolve_bom_file(filename)
             content = source_path.read_bytes()
             source = source_path.name
         rows = parse_bom(source, content)

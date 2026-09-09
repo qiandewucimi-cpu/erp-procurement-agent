@@ -119,7 +119,7 @@ class AuditorAndToolTest(unittest.TestCase):
     def test_tool_missing_file(self):
         result = json.loads(self.tools.call("detect_material_errors", {"filename": "不存在.xlsx"}))
         self.assertFalse(result["ok"])
-        self.assertIn("文件不存在", result["error"])
+        self.assertIn("找不到 BOM 文件", result["error"])
 
 
 if __name__ == "__main__":

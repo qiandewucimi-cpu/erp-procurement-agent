@@ -3,10 +3,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
+    # 运行时注入密钥：env_file 只影响容器的运行环境变量，不会写进镜像层。
+    # .env 已被 .gitignore 与 .dockerignore 双重排除，镜像始终保持干净。
+    env_file:
+      - path: .env
+        required: false
     ports:
       - "8000:8000"
     volumes:
       - erp_demo_data:/app/data
+      - ./uploads:/app/uploads
 
   ui:
     build:
@@ -16,9 +22,10 @@ services:
       ERP_AGENT_API: http://api:8000
     ports:
       - "8501:8501"
+    volumes:
+      - ./uploads:/app/uploads
     depends_on:
       - api
 
 volumes:
   erp_demo_data:
-

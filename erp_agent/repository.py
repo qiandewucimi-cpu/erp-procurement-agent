@@ -173,6 +173,54 @@ class ERPRepository:
             rows = con.execute("SELECT * FROM materials ORDER BY material_code").fetchall()
         return [dict(row) for row in rows]
 
+    def import_materials(self, rows: list[dict]) -> dict:
+        """把用户的物料档案批量写入模拟 ERP（已存在则更新）。
+
+        逐行校验，坏行只跳过不中断整批，返回 imported / updated / skipped 统计，
+        skipped 带行号与原因，便于前端原样展示给用户。
+        """
+        imported = updated = 0
+        skipped: list[dict] = []
+        with self.session() as con:
+            for index, row in enumerate(rows, 1):
+                code = str(row.get("material_code") or "").strip()
+                if not code:
+                    skipped.append({"row": index, "reason": "物料编码为空"})
+                    continue
+                try:
+                    unit_price = float(row.get("unit_price"))
+                    packaging_fee = float(row.get("packaging_fee") or 0)
+                except (TypeError, ValueError):
+                    skipped.append({"row": index, "material_code": code, "reason": "单价缺失或不是数字"})
+                    continue
+                if unit_price < 0 or packaging_fee < 0:
+                    skipped.append({"row": index, "material_code": code, "reason": "单价或包装费为负数"})
+                    continue
+
+                exists = con.execute(
+                    "SELECT 1 FROM materials WHERE material_code = ?", (code,)
+                ).fetchone()
+                con.execute(
+                    "INSERT OR REPLACE INTO materials "
+                    "(material_code, material_name, supplier_code, supplier_name, "
+                    " unit_price, packaging_fee, currency) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        code,
+                        str(row.get("material_name") or "").strip() or code,
+                        str(row.get("supplier_code") or "").strip() or "SUP-IMPORTED",
+                        str(row.get("supplier_name") or "").strip() or "导入供应商",
+                        unit_price,
+                        packaging_fee,
+                        str(row.get("currency") or "").strip() or "CNY",
+                    ),
+                )
+                if exists:
+                    updated += 1
+                else:
+                    imported += 1
+        return {"imported": imported, "updated": updated, "skipped": skipped}
+
     def save_error_report(self, summary: dict, errors: list[dict], operator: str = "demo_user") -> str:
         """把错误报告写入 error_reports 表，模拟推送到录单员的消息队列（outbox）。"""
         report_id = f"ERR-{uuid4().hex[:10].upper()}"

@@ -55,5 +55,11 @@ def detect_material_errors(filename: str, min_level: str = "warning", push: bool
     return tools.call("detect_material_errors", {"filename": filename, "min_level": min_level, "push": push})
 
 
+@mcp.tool()
+def import_material_master(filename: str) -> str:
+    """把用户的物料档案表（Excel/CSV）导入模拟 ERP 的物料主数据，已存在的编码则更新价格。导入后再用自己的 BOM 才不会被判为「未建档」。"""
+    return tools.call("import_material_master", {"filename": filename})
+
+
 if __name__ == "__main__":
     mcp.run()

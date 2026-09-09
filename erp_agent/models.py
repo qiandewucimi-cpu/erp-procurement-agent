@@ -17,6 +17,10 @@ class DetectRequest(BaseModel):
     push: bool = Field(default=False, description="true 时把错误报告写入推送队列（模拟推送给录单员）")
 
 
+class MaterialImportRequest(BaseModel):
+    filename: str = Field(description="物料档案文件名，需放在 samples/ 或 uploads/ 下，如「物料档案模板.xlsx」")
+
+
 class ChatRequest(BaseModel):
     messages: list[dict[str, Any]] = Field(description="OpenAI 格式对话历史（含 role 与 content）")
     session_id: str | None = Field(default=None, description="会话 ID，传入后接续该会话上下文")
