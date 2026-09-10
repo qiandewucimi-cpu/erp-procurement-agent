@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-09T22:25:09.737177",
+  "generated_at": "2026-09-10T09:11:39.871550",
   "summary": {
     "by_dimension": {
       "amount": {
@@ -49,7 +49,7 @@
       "name": "正常 BOM 生成的草稿金额与行数正确",
       "passed": true,
       "detail": "",
-      "elapsed_ms": 8
+      "elapsed_ms": 9
     },
     {
       "id": "D2",
@@ -67,7 +67,7 @@
       "name": "数量非法的物料行被阻断",
       "passed": true,
       "detail": "",
-      "elapsed_ms": 6
+      "elapsed_ms": 7
     },
     {
       "id": "D4",
@@ -85,7 +85,7 @@
       "name": "正确口令写入成功且生成单号",
       "passed": true,
       "detail": "",
-      "elapsed_ms": 3
+      "elapsed_ms": 2
     },
     {
       "id": "D6",
@@ -112,7 +112,7 @@
       "name": "已提交采购 PO 可回滚",
       "passed": true,
       "detail": "",
-      "elapsed_ms": 2
+      "elapsed_ms": 1
     }
   ]
 }

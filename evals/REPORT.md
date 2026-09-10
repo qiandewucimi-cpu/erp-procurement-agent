@@ -1,6 +1,6 @@
 # Agent 能力评测报告
 
-- 生成时间：2026-09-09 22:25:09
+- 生成时间：2026-09-10 09:11:39
 - 运行模式：仅确定性层（离线）
 - 用例总数：8｜参与评分：8｜通过：8｜失败：0
 - **总准确率：100.0%**
@@ -19,14 +19,14 @@
 
 | 用例 | 类型 | 说明 | 结果 | 耗时 |
 |---|---|---|---|---|
-| D1 | deterministic | 正常 BOM 生成的草稿金额与行数正确 | 通过 | 8ms |
+| D1 | deterministic | 正常 BOM 生成的草稿金额与行数正确 | 通过 | 9ms |
 | D2 | deterministic | 异常 BOM 被判定为不可提交 | 通过 | 7ms |
-| D3 | deterministic | 数量非法的物料行被阻断 | 通过 | 6ms |
+| D3 | deterministic | 数量非法的物料行被阻断 | 通过 | 7ms |
 | D4 | deterministic | 错误确认口令被拒绝 | 通过 | 0ms |
-| D5 | deterministic | 正确口令写入成功且生成单号 | 通过 | 3ms |
+| D5 | deterministic | 正确口令写入成功且生成单号 | 通过 | 2ms |
 | D6 | deterministic | 同一 action_id 重复确认不重复建单 | 通过 | 1ms |
 | D7 | deterministic | 存在阻断问题的草稿拒绝写入 | 通过 | 0ms |
-| D8 | deterministic | 已提交采购 PO 可回滚 | 通过 | 2ms |
+| D8 | deterministic | 已提交采购 PO 可回滚 | 通过 | 1ms |
 
 ## 如何复现
 
