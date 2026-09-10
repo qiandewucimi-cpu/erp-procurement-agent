@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/qiandewucimi-cpu/erp-procurement-agent/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
-![coverage](https://img.shields.io/badge/coverage-88%25-brightgreen)
+![coverage](https://img.shields.io/badge/coverage-89%25-brightgreen)
 ![eval](https://img.shields.io/badge/eval-15%2F15%20passed-success)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -34,7 +34,7 @@ flowchart TB
     LOOP --> CC[confirm_commit<br/>写入 · 需口令 · 幂等]
     LOOP --> RB[rollback_po<br/>回滚]
     LOOP --> DM[detect_material_errors<br/>物料错误分级]
-    LOOP --> IM[import_materials<br/>物料档案导入]
+    LOOP --> IM[import_material_master<br/>物料档案导入]
     CP --> DB[(SQLite 模拟 ERP)]
     CC --> DB
     RB --> DB
@@ -170,13 +170,18 @@ LLM_MODEL=qwen2.5:7b
 
 | 方法 | 路径 | 作用 |
 |---|---|---|
-| GET | `/health` | 健康检查与演示模式声明 |
+| GET | `/health` | 健康检查 + `llm_enabled`/`llm_model`（可判断模型是否真在工作）|
 | POST | `/agent/chat` | 多轮对话：模型自主编排工具完成采购业务 |
 | POST | `/agent/prepare` | 确定性六步流水线（离线兼容） |
 | POST | `/agent/confirm` | 使用明确口令确认写入 |
 | POST | `/agent/rollback` | 回滚已写入的采购 PO |
+| POST | `/agent/detect` | 物料错误检测：解析 BOM → 逐行校验 → 分级报告 |
 | GET | `/orders` | 查看模拟 ERP 单据 |
 | GET | `/audit` | 查看审计日志 |
+| GET | `/error_reports` | 查看物料错误报告推送队列 |
+| GET | `/samples` | 列出可用示例文件 |
+| GET | `/materials` | 列出模拟 ERP 物料档案 |
+| POST | `/materials/import` | 导入物料档案（已存在编码则更新价格） |
 
 另有 `mcp_server.py`：把 7 个工具暴露为标准 MCP 工具，可接入任意 MCP 客户端（Claude Desktop、Cursor 等）。
 
