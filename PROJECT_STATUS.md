@@ -12,7 +12,7 @@
 | 当前版本 | v0.3 工具调用循环 Agent（Function Calling + 多轮对话 + MCP） |
 | 当前阶段 | 核心闭环 + UI 真实点击演示均已完成（截图入作品集）；剩余现场业务规则复核 |
 | 主业务场景 | BOM → 采购 PO |
-| 目标受众 | 秋招 FDE / AI 应用工程岗位面试官 |
+| 目标受众 | FDE / AI 应用工程方向的作品展示 |
 | 数据边界 | 仅使用合成数据；不连接公司生产系统 |
 | 推荐启动入口 | `start_demo.cmd` |
 | Web 页面 | `http://localhost:8501` |
@@ -69,7 +69,7 @@
 - [x] Docker API 镜像、UI 镜像与 Compose 编排（已真实构建 + 容器端到端冒烟 8/8 通过）；
 - [x] `.dockerignore`：阻止 `.env`、`data/*.db`、内部资料进入镜像；
 - [x] README；
-- [x] 演示与定位文档（`docs/ui-demo.md` 演示验证记录；面试自用材料不随发布版公开）；
+- [x] 演示与定位文档（`docs/ui-demo.md` 演示验证记录；本地专用材料不随发布版公开）；
 
 ## 4. 验证记录
 
@@ -165,7 +165,7 @@
 - [ ] 增加模拟 ERP Adapter 接口层，方便未来替换真实 API；
 - [ ] 增加采购 PO 导出 Excel/PDF；
 - [x] 录制演示视频并制作项目架构图（架构图 v3 已完成；UI 演示截图 4 张已于 2026-09-09 补充至 `docs/ui-demo/`，仅差可选录屏合成）；
-- [ ] 整理简历 bullet、项目复盘与问答材料；
+- [ ] 整理项目复盘与问答材料；
 - [x] 执行完整 Docker 构建与容器运行测试（2026-09-09 完成：真实构建 + 8/8 容器冒烟 + 持久化与安全扫描）。
 
 ## 7. 已知边界与风险
@@ -221,12 +221,12 @@
 
 ### 2026-09-09 22:50
 
-- 本次目标：按"公开仓库=面试官第一印象"的要求，移除面试自用材料，并对仓库做面试官视角的全面审查与脱敏。
-- 实际完成：① 从发布版移除两份面试自用材料（源头工作区保留自用，不进发布版）；② README 优化：安全声明措辞中性化、"3 分钟能看到什么"补 import 演示、mermaid 架构图补齐 7 个工具节点（detect_material_errors + import_materials）、评测描述改为"CI 离线 8/8 + 最近一次全量 15/15"双行口径、代码阅读顺序扩为 10 条并补 `erp_agent/validator.py`；③ architecture.html 工具层升级为 7 个业务工具（新增 import_materials 节点）、端点列表补 `/materials/import` 与 `GET /materials`、验证横幅更新为"单测 58/58 · MCP 7 工具"；④ 全仓内部措辞中性化：README、`物料错误检测_设计说明.md`（痛点来源表述、定位口径）、PROJECT_STATUS（演示脚本）、docs/ui-demo.md（去掉对已删脚本的引用）。
-- 改动文件：`README.md`、`PROJECT_STATUS.md`、`architecture.html`、`docs/ui-demo.md`、`物料错误检测_设计说明.md`；删除两份面试自用材料。
+- 本次目标：按"公开仓库=对外第一印象"的要求，移除本地专用材料，并对仓库做外部视角的全面审查与脱敏。
+- 实际完成：① 从发布版移除两份本地专用材料（源头工作区保留自用，不进发布版）；② README 优化：安全声明措辞中性化、"3 分钟能看到什么"补 import 演示、mermaid 架构图补齐 7 个工具节点（detect_material_errors + import_materials）、评测描述改为"CI 离线 8/8 + 最近一次全量 15/15"双行口径、代码阅读顺序扩为 10 条并补 `erp_agent/validator.py`；③ architecture.html 工具层升级为 7 个业务工具（新增 import_materials 节点）、端点列表补 `/materials/import` 与 `GET /materials`、验证横幅更新为"单测 58/58 · MCP 7 工具"；④ 全仓内部措辞中性化：README、`物料错误检测_设计说明.md`（痛点来源表述、定位口径）、PROJECT_STATUS（演示脚本）、docs/ui-demo.md（去掉对已删脚本的引用）。
+- 改动文件：`README.md`、`PROJECT_STATUS.md`、`architecture.html`、`docs/ui-demo.md`、`物料错误检测_设计说明.md`；删除两份本地专用材料。
 - 验证命令与结果：全仓敏感词扫描 0 命中（覆盖内部组织名与内部语境词）；本次仅文档与静态页改动，未触碰代码，58/58 测试与 8/8 离线评测仍有效。
 - 遇到的问题：PROJECT_STATUS 被 PowerShell 重写引入 BOM，已用 .NET 写回无 BOM UTF-8；git diff 确认无整文件噪声。
-- 遗留问题：源头工作区保留两份面试自用材料（有意差异，.dockerignore 已排除）；samples 两个 BOM 文件哈希与源头不同（内容逐行一致，仅为重新保存的元数据差异，不处理）。
+- 遗留问题：源头工作区保留两份本地专用材料（有意差异，.dockerignore 已排除）；samples 两个 BOM 文件哈希与源头不同（内容逐行一致，仅为重新保存的元数据差异，不处理）。
 
 ### 2026-09-09 22:25
 
