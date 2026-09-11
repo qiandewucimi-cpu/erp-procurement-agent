@@ -50,6 +50,8 @@ APP_ID = os.getenv("FEISHU_APP_ID", "").strip()
 APP_SECRET = os.getenv("FEISHU_APP_SECRET", "").strip()
 ALLOWED_OPEN_IDS = {x.strip() for x in os.getenv("FEISHU_ALLOWED_OPEN_IDS", "").split(",") if x.strip()}
 REQUIRE_MENTION_IN_GROUP = os.getenv("FEISHU_REQUIRE_MENTION_IN_GROUP", "true").lower() in ("1", "true", "yes")
+# 回复用消息卡片（渲染 Markdown、按语义上色）；设为 false 则退回纯文本
+REPLY_WITH_CARD = os.getenv("FEISHU_REPLY_CARD", "true").lower() in ("1", "true", "yes")
 
 # 文件扩展名白名单：只有这些才当作 BOM / 物料档案处理
 _FILE_EXTS = {".xlsx", ".xlsm", ".xls", ".csv"}
@@ -172,6 +174,86 @@ def _trace_summary(trace: list) -> str:
     return f"\n\n—\n工具调用 {len(trace)} 步：{'、'.join(names)}"
 
 
+# --------------------------------------------------------------------------- #
+# 消息卡片：展示增强（渲染 Markdown、按语义上色）
+# 安全约束：卡片只读，**不放一键写入按钮** —— 写入必须靠用户回复「确认提交」口令。
+# --------------------------------------------------------------------------- #
+_MD_FENCE_LINE = re.compile(r"^\s*```.*$", re.MULTILINE)
+_MD_HEAD_MARKS = re.compile(r"^#{1,6}\s*", re.MULTILINE)
+_MD_TABLE_SEP = re.compile(r"^\s*\|[\s:|-]+\|\s*$", re.MULTILINE)
+
+
+def _to_lark_md(reply: str) -> str:
+    """卡片正文用 lark_md：保留 **加粗** 与列表，去掉代码围栏、# 标题符号和表格分隔行。"""
+    text = _MD_FENCE_LINE.sub("", reply or "")
+    text = _MD_TABLE_SEP.sub("", text)
+    text = _MD_HEAD_MARKS.sub("", text)
+    return text.strip() or _EMPTY_REPLY
+
+
+def _pick_header_template(text: str) -> str:
+    """按语义给卡片上色：出错橙、写入成功绿、其余蓝。"""
+    if any(k in text for k in ("阻断", "错误", "失败", "未建档", "不通过")):
+        return "orange"
+    if any(k in text for k in ("已写入", "写入成功", "COMMITTED", "已提交")):
+        return "green"
+    return "blue"
+
+
+def _build_card(reply_md: str, trace: list, llm_enabled: bool) -> dict:
+    elements: list = [{"tag": "div", "text": {"tag": "lark_md", "content": reply_md}}]
+
+    notes: list = []
+    if trace:
+        names: list = []
+        for item in trace:
+            name = item.get("tool", "?")
+            if name not in names:
+                names.append(name)
+        notes.append(f"工具调用 {len(trace)} 步：{'、'.join(names)}")
+    if not llm_enabled:
+        notes.append("模型未启用，当前为确定性流水线模式")
+    # 仅当这条回复看起来是「待写入的草稿」时才提示口令，避免每条消息都刷屏
+    if any(k in reply_md for k in ("草稿", "待确认", "确认提交", "action_id")):
+        notes.append("以上为草稿预览，确认无误请回复「确认提交」，才会真正写入")
+
+    if notes:
+        elements.append({"tag": "hr"})
+        elements.append(
+            {"tag": "note", "elements": [{"tag": "plain_text", "content": " ｜ ".join(notes)}]}
+        )
+
+    return {
+        "config": {"wide_screen_mode": True},
+        "header": {
+            "template": _pick_header_template(reply_md),
+            "title": {"tag": "plain_text", "content": "外贸 ERP Agent"},
+        },
+        "elements": elements,
+    }
+
+
+def _send_card(open_id: str, card: dict) -> bool:
+    """发送交互卡片；返回是否成功，失败时由调用方回退为纯文本。"""
+    body = (
+        CreateMessageRequestBody.builder()
+        .receive_id(open_id)
+        .msg_type("interactive")
+        .content(json.dumps(card, ensure_ascii=False))
+        .build()
+    )
+    request = CreateMessageRequest.builder().receive_id_type("open_id").request_body(body).build()
+    try:
+        response = client.im.v1.message.create(request)
+    except Exception as exc:  # noqa: BLE001 - 网络/SDK 异常都不该让机器人静默
+        print(f"[warn] 卡片发送异常 {type(exc).__name__}: {exc}")
+        return False
+    if not response.success():
+        print(f"[warn] 卡片发送失败 code={response.code} msg={response.msg}")
+        return False
+    return True
+
+
 def _reply_with_agent(open_id: str, user_text: str, session_id: str) -> None:
     try:
         with _agent_lock:
@@ -180,11 +262,20 @@ def _reply_with_agent(open_id: str, user_text: str, session_id: str) -> None:
         _send_text(open_id, f"（处理失败：{type(exc).__name__}: {exc}）")
         return
 
-    reply = _to_feishu_text(result.get("reply", ""))
-    reply += _trace_summary(result.get("tool_trace", []))
-    if not result.get("llm_enabled"):
-        reply += "\n\n（提示：模型未启用，当前为确定性流水线模式）"
-    _send_text(open_id, reply)
+    raw = result.get("reply", "")
+    trace = result.get("tool_trace", []) or []
+    llm_enabled = bool(result.get("llm_enabled"))
+
+    # 优先发消息卡片（渲染 Markdown + 按语义上色）；失败则退回纯文本，保证不失联
+    if REPLY_WITH_CARD:
+        if _send_card(open_id, _build_card(_to_lark_md(raw), trace, llm_enabled)):
+            return
+        print("[warn] 卡片发送未成功，回退为纯文本")
+
+    text = _to_feishu_text(raw) + _trace_summary(trace)
+    if not llm_enabled:
+        text += "\n\n（提示：模型未启用，当前为确定性流水线模式）"
+    _send_text(open_id, text)
 
 
 # --------------------------------------------------------------------------- #

@@ -126,7 +126,11 @@ FEISHU_APP_SECRET=你的AppSecret
 FEISHU_ALLOWED_OPEN_IDS=
 # 可选：群里被 @ 时才响应（单聊不受影响）。
 FEISHU_REQUIRE_MENTION_IN_GROUP=true
+# 可选：回复用消息卡片（Markdown 渲染 + 按语义上色：报错橙/成功绿）。设为 false 退回纯文本。
+FEISHU_REPLY_CARD=true
 ```
+
+机器人默认以**消息卡片**回复：正文保留加粗与列表，按语义给标题上色（错误橙 / 写入成功绿），并在草稿类回复底部常驻提示"确认无误请回复「确认提交」"。卡片发送失败会自动回退为纯文本，不会失联。
 
 飞书开发者后台还需完成 4 步：① 添加「机器人」应用能力；② 权限管理开通 `im:message`、`im:message:send_as_bot`、`im:resource` 等；③ 事件与回调选择**长连接**并订阅 `im.message.receive_v1`；④ 版本管理与发布。
 
