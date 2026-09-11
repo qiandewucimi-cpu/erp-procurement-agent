@@ -8,9 +8,9 @@
 
 | 项目 | 当前状态 |
 |---|---|
-| 最后更新时间 | 2026-09-11 21:10（Asia/Shanghai） |
+| 最后更新时间 | 2026-09-11 21:20（Asia/Shanghai） |
 | 当前版本 | v0.5 工具调用循环 Agent（Function Calling + 多轮对话 + MCP + 飞书对话入口 + 消息卡片） |
-| 当前阶段 | 核心闭环 + UI 真实点击演示 + 飞书四条链路（文本对话 / BOM→PO / 文件上传 / 错误检测+推送）全部实测通过 + 飞书回复已升级为消息卡片（Markdown 渲染 + 按语义上色）；剩余现场业务规则复核 |
+| 当前阶段 | 核心闭环 + UI 真实点击演示 + 飞书四条链路（文本对话 / BOM→PO / 文件上传 / 错误检测+推送）全部实测通过 + 飞书回复已升级为消息卡片（Markdown 渲染 + 按语义上色）+ App Secret 已轮换；剩余现场业务规则复核 |
 | 主业务场景 | BOM → 采购 PO |
 | 目标受众 | FDE / AI 应用工程方向的作品展示 |
 | 数据边界 | 仅使用合成数据；不连接公司生产系统 |
@@ -107,6 +107,8 @@
 | 2026-09-11 | 飞书机器人日志块缓冲缺陷修复 | 通过：`feishu_bot.py` 顶部加 `sys.stdout/stderr.reconfigure(line_buffering=True)`（try/except 兜底），`py_compile` 通过后重启，实时日志立即可见 |
 | 2026-09-11 | **飞书「上传 BOM 文件」分支实测** | 通过：飞书单聊发送 `异常示例_BOM.xlsx` → 机器人回"已收到…"，日志 `[info] 文件已落地 ...\uploads\异常示例_BOM.xlsx`；落地文件 5229B 与源文件字节数一致（`im:resource` 下载正常、未损坏） |
 | 2026-09-11 | **飞书「物料错误检测 + 推送」分支实测** | 通过：不点名文件（靠 `_last_file` 记忆靠上传文件名）说"检测…并把报告推送到错误报告队列" → `error_reports` 0→1，`ERR-1F1D3D2841` / `PENDING_PUSH` / created_at 20:26:44；summary `total_rows=3, error_count=3, blocking=2, warning=1`；明细：MAT-FAB-001 名称不一致(warning)、MAT-UNKNOWN-999 未建档(blocking)、MAT-ZIP-002 数量非法(blocking) |
+| 2026-09-11 | **飞书回复升级为消息卡片** | 通过：`feishu_bot.py` 新增 `_to_lark_md` / `_pick_header_template` / `_build_card` / `_send_card`，回复优先走 `msg_type=interactive` 卡片（Markdown 正文 + 按语义上色 header：报错橙 / 成功绿 / 默认蓝），卡片附工具调用步数、模型状态、草稿待确认 note；发送失败自动回退纯文本。离线构建自测 5 场景全部输出 `ALL_CARD_CASES_OK`；`py_compile` 通过；机器人重启后飞书实测卡片正常渲染、无发送失败告警 |
+| 2026-09-11 | **飞书 App Secret 轮换（安全收尾）** | 通过：开发者后台「凭证与基础信息」重置 App Secret → 新值**直接写入 `.env`**（未经任何日志 / 文档 / 对话回显）→ 重启机器人 → 21:15:16 `connected to wss://msg-frontier.feishu.cn/ws/v2` 握手成功（长连接握手须用有效 App ID + Secret 换 ticket，即证明新 Secret 生效）。`.env` 完整性校验：无 BOM / 21 行 / LF / 仅 `FEISHU_APP_SECRET` 一行变更，其余键原样 |
 
 ## 5. 已遇到并解决的问题
 
@@ -202,6 +204,9 @@
 | 2026-09-11 | 飞书接入选「自建应用 + 长连接（WebSocket）」 | 无需公网 IP / 域名 / 内网穿透，本机常驻一个进程即可。对比：自定义机器人 Webhook 只能推送不能对话；事件回调需公网 HTTPS。长连接的适配层最薄，`api.py`/`ui.py`/`erp_agent/*` 零改动 |
 | 2026-09-11 | 飞书侧鉴权以「可用范围」为第一道门，`FEISHU_ALLOWED_OPEN_IDS` 为第二道门 | 飞书后台「可用范围」已限定为仅本人，应用内白名单属纵深防御而非必需；当为演示放宽可用范围时才需回填白名单（应用内第二道门） |
 
+| 2026-09-11 | 飞书回复升级为消息卡片，但**卡片保持只读**（无「一键写入」按钮） | 卡片只做展示增强（Markdown 渲染、按语义上色）；写操作仍必须由用户回复「确认提交」口令触发。刻意不放交互按钮，是为了让「高危写入需人工确认」这条安全红线在飞书侧同样成立，而不是被一个按钮绕过 |
+| 2026-09-11 | App Secret 暴露后立即轮换，且新值不落任何日志 / 文档 | 旧 Secret 曾在对话中明文出现即视为已泄露。轮换时遵守：新值由脚本从后台页面直接写入 `.env`，不回显到终端、不许写入 PROJECT_STATUS / 记忆 / commit message；验证只用「长度 + 首尾字符」口径 |
+
 ## 9. 下一步执行顺序
 
 1. 用户在本机运行 `start_demo.cmd`，完成正常、异常、确认、审计和回滚体验；
@@ -227,6 +232,16 @@
 ```
 
 ## 11. 工作日志
+
+### 2026-09-11 21:20
+
+- 本次目标：完成上一条（21:10）遗留的安全收尾项——轮换飞书 App Secret（该值曾在对话中明文出现）。
+- 实际完成：① 用 CDP 驱动真实浏览器（复用飞书开放平台登录态）打开「凭证与基础信息」页，点 ↻ 重置并在确认弹窗中确认；② 展开显示后由脚本从页面 DOM 读出新 Secret，**直接写入 `.env`**，全程未回显到终端 / 日志 / 本文档；③ 停掉旧机器人进程（42920 / 44960）→ 用新配置重启 → 21:15:16 长连接握手成功；④ 校验 `.env` 完整性与其余键未受影响。
+- 改动文件：`.env`（不入库，仅 `FEISHU_APP_SECRET` 一行）、本文件。
+- 验证命令与结果：机器人日志 `[Lark] ... connected to wss://msg-frontier.feishu.cn/ws/v2`（新 Secret 生效）；`.env` 校验 `has BOM: False / CRLF: 0 / lines: 21 / FEISHU_APP_SECRET len=32`，`LLM_*` / `FEISHU_APP_ID` / `FEISHU_ALLOWED_OPEN_IDS` / `FEISHU_REPLY_CARD` 均原样。
+- 遇到的问题：① 页面有**两个** `.secret-code`（App ID 与 App Secret 共用样式），首次用 `.first` 取到的是 **App ID**（20 位 `cli_...`）→ 改用 `.auth-info__secret` 作用域定位正确；⚠️ 注意脚本必须**幂等**，重跑前先确认不会再次触发重置弹窗。② Windows 上 `timeout` 会解析到系统 `timeout.exe`，别用它给 git 命令设超时。
+- 遗留问题：无（飞书这条线安全项已闭环）。
+- 下一步第一动作：飞书里随便发一条消息，确认消息卡片与工具链仍正常（回归验证）。
 
 ### 2026-09-11 21:10
 
