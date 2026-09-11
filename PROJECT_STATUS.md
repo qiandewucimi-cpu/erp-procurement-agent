@@ -8,13 +8,14 @@
 
 | 项目 | 当前状态 |
 |---|---|
-| 最后更新时间 | 2026-09-09 22:25（Asia/Shanghai） |
-| 当前版本 | v0.3 工具调用循环 Agent（Function Calling + 多轮对话 + MCP） |
-| 当前阶段 | 核心闭环 + UI 真实点击演示均已完成（截图入作品集）；剩余现场业务规则复核 |
+| 最后更新时间 | 2026-09-11 18:30（Asia/Shanghai） |
+| 当前版本 | v0.4 工具调用循环 Agent（Function Calling + 多轮对话 + MCP + 飞书对话入口） |
+| 当前阶段 | 核心闭环 + UI 真实点击演示 + 飞书端到端实测均已完成（截图入作品集）；剩余现场业务规则复核 |
 | 主业务场景 | BOM → 采购 PO |
 | 目标受众 | FDE / AI 应用工程方向的作品展示 |
 | 数据边界 | 仅使用合成数据；不连接公司生产系统 |
 | 推荐启动入口 | `start_demo.cmd` |
+| 飞书对话入口 | `start_feishu.cmd`（飞书自建应用 + 长连接，无需公网） |
 | Web 页面 | `http://localhost:8501` |
 | API 文档 | `http://127.0.0.1:8000/docs` |
 
@@ -69,6 +70,7 @@
 - [x] Docker API 镜像、UI 镜像与 Compose 编排（已真实构建 + 容器端到端冒烟 8/8 通过）；
 - [x] `.dockerignore`：阻止 `.env`、`data/*.db`、内部资料进入镜像；
 - [x] README；
+- [x] 飞书对话入口：`feishu_bot.py`（长连接机器人，同进程复用同一 Agent，安全边界不变）+ `start_feishu.cmd` 一键启动 + `docs/飞书接入方案.md` 方案与步骤；
 - [x] 演示与定位文档（`docs/ui-demo.md` 演示验证记录；本地专用材料不随发布版公开）；
 
 ## 4. 验证记录
@@ -100,6 +102,9 @@
 | 2026-09-09 | 全量测试 | 48/48 通过 |
 | 2026-09-09 | **Streamlit UI 真实点击演示（浏览器实测）** | 通过：① 模型自主调用 `detect_material_errors`（3 行 3 错误，阻断 2 / 警告 1）、`create_purchase_order`（¥24164）、`confirm_commit`（PO-DEMO-20260909-6E25）三个工具并展示轨迹；② "订单与审计"页三张表全部渲染（采购 PO / 审计日志 5 条 / 错误报告队列 PENDING_PUSH）。截图见 `docs/ui-demo/`，记录见 `docs/ui-demo.md` |
 | 2026-09-09 | 物料档案导入功能（工作区已完成，本次从源头同步至发布副本） | 通过：`unittest` 58/58 OK（含新增 `tests/test_material_import.py`），evals offline 8/8 100%；同时修正 `test_material_errors` 缺失文件断言以匹配 `resolve_bom_file` 新报错文案 |
+| 2026-09-11 | 飞书长连接机器人联通（`feishu_bot.py`） | 通过：飞书开发者后台「重新验证」返回"连接成功"；机器人日志出现 `connected to wss://msg-frontier.feishu.cn/ws/v2` |
+| 2026-09-11 | **飞书端到端实测（BOM → 草稿 → 确认写入）** | 通过：17:57:43 由 `正常示例_BOM.xlsx` 生成草稿 ¥24164.0（3 行物料）；17:57:56 确认写入 `PO-DEMO-20260911-3F99`（COMMITTED）。草稿到写入间隔 13 秒，证明"先给草稿、说「确认提交」才写入"的安全边界在飞书侧同样生效 |
+| 2026-09-11 | 飞书机器人日志块缓冲缺陷修复 | 通过：`feishu_bot.py` 顶部加 `sys.stdout/stderr.reconfigure(line_buffering=True)`（try/except 兜底），`py_compile` 通过后重启，实时日志立即可见 |
 
 ## 5. 已遇到并解决的问题
 
@@ -192,6 +197,8 @@
 | 2026-09-07 | 意图识别采用本地+云端双链路 | 本地 Ollama 符合离线/学习路线，云端 API 保底质量；统一走 OpenAI 兼容接口 |
 | 2026-09-07 | 从固定六步流水线升级为工具调用循环 Agent | 用户反馈"没体会到 agent"，对标 GitHub 同类项目后确定：agent 感来自模型自主编排工具，而非固定流水线；安全边界由工具内部确定性代码保证 |
 | 2026-09-07 | 云端模型默认用智谱 glm-4-flash | 小模型（qwen2:1.5b）工具调用不稳，glm-4-flash 支持 function calling 且稳定 |
+| 2026-09-11 | 飞书接入选「自建应用 + 长连接（WebSocket）」 | 无需公网 IP / 域名 / 内网穿透，本机常驻一个进程即可。对比：自定义机器人 Webhook 只能推送不能对话；事件回调需公网 HTTPS。长连接的适配层最薄，`api.py`/`ui.py`/`erp_agent/*` 零改动 |
+| 2026-09-11 | 飞书侧鉴权以「可用范围」为第一道门，`FEISHU_ALLOWED_OPEN_IDS` 为第二道门 | 飞书后台「可用范围」已限定为仅本人，应用内白名单属纵深防御而非必需；当为演示放宽可用范围时才需回填白名单（应用内第二道门） |
 
 ## 9. 下一步执行顺序
 
@@ -218,6 +225,16 @@
 ```
 
 ## 11. 工作日志
+
+### 2026-09-11 18:30
+
+- 本次目标：把 Agent 接进飞书对话（不必每次打开网页），完成落地、后台配置与端到端验证。
+- 实际完成：① 评估四条接入路线并选定「自建应用 + 长连接」，产出 `docs/飞书接入方案.md`；② 新增 `feishu_bot.py` 适配层（`lark.ws.Client` 长连接 + `im.message.receive_v1` 事件；message_id 幂等去重；`feishu:{open_id}` 会话映射；文件消息落 `uploads/` 并剥 basename 防路径穿越；Markdown→飞书纯文本清洗；tool_trace 压行摘要；open_id 白名单；群里需 @；每消息起线程 + Lock 保护 sessions）——`api.py`/`ui.py`/`erp_agent/*` **零改动**；③ 新增 `start_feishu.cmd` 一键启动；④ `.env` / `.env.example` 增加 `FEISHU_APP_ID`/`FEISHU_APP_SECRET`/`FEISHU_ALLOWED_OPEN_IDS`/`FEISHU_REQUIRE_MENTION_IN_GROUP`，`requirements.txt` 增加 `lark-oapi>=1.4.0`（实装 1.7.3）；⑤ 飞书开发者后台 4 步配置全部完成（机器人能力 / 5 个免审权限 / 长连接订阅 `im.message.receive_v1` / 版本 1.0.0 发布），长连接验证"连接成功"；⑥ 飞书内端到端实测通过（见验证记录）；⑦ 修复日志块缓冲缺陷；⑧ 按用户要求清空 `FEISHU_ALLOWED_OPEN_IDS`（可用范围已限定仅本人）。
+- 改动文件：`feishu_bot.py`（新增）、`start_feishu.cmd`（新增）、`docs/飞书接入方案.md`（新增）、`.env`（不入库）、`.env.example`、`requirements.txt`、`README.md`、本文件。
+- 验证命令与结果：`py_compile feishu_bot.py` 通过；导入冒烟（Agent 构建、7 工具、Markdown 清洗、去 @ 占位符、轨迹摘要、幂等去重）全部符合预期；飞书端到端实测通过（草稿 ¥24164 → `PO-DEMO-20260911-3F99`）；`api.py`/`ui.py`/`mcp_server.py` 未受影响。
+- 遇到的问题：① `print()` 重定向到管道时块缓冲，日志迟迟不可见 → 顶部 `reconfigure(line_buffering=True)`；② Windows 上 `Start-Process -RedirectStandardOutput` 用管道 + 后台读取线程实现，启动它的 shell 一退出子进程输出全丢并静默退出 → 改用 Bash 后台任务 + `> log 2>&1`；③ `.venv\Scripts\python.exe` 在 Windows 上是「启动器 + 子解释器」两个进程，**不是重复实例**。
+- 遗留问题：飞书"物料错误检测 + 推送"分支与"上传 BOM 文件"分支未实测（`error_reports` 仍为 0 条）；`README`/`PROJECT_STATUS` 已补飞书章节；App Secret 曾在对话中明文出现，建议重置。
+- 下一步第一动作：在飞书里上传 `异常示例_BOM.xlsx`，验证物料错误检测 + 推送队列分支。
 
 ### 2026-09-09 22:50
 

@@ -27,6 +27,7 @@
 flowchart TB
     U[用户] -->|自然语言| UI[Streamlit 聊天工作台]
     UI -->|HTTP/JSON| API[FastAPI Agent API]
+    FS[飞书长连接机器人<br/>feishu_bot.py] -->|同进程复用 Agent| LOOP
     API --> LOOP{工具调用循环<br/>AgentLoop}
     LOOP --> SK[search_knowledge<br/>规则检索]
     LOOP --> QM[query_materials<br/>物料/价格查询 · 只读]
@@ -103,6 +104,33 @@ MCP 工具也可单独验证（stdio 协议，7 个工具）：
 ```powershell
 python smoke_mcp.py
 ```
+
+### 飞书对话入口（可选，无需公网）
+
+除了网页工作台，也可以把**同一个 Agent** 接进飞书对话——在飞书里直接发消息，不必每次打开网页。
+
+原理是**飞书自建应用 + 长连接（WebSocket）**：机器人主动连到飞书，因此**不需要公网 IP、域名或内网穿透**，本机常驻一个进程即可。
+
+```powershell
+.\.venv\Scripts\python.exe feishu_bot.py
+```
+
+Windows 下双击 `start_feishu.cmd` 更省事。启动后在飞书里搜到你的机器人，直接发消息即可（群里需要 @ 机器人）。
+
+`.env` 中的飞书配置项：
+
+```dotenv
+FEISHU_APP_ID=cli_你的AppID
+FEISHU_APP_SECRET=你的AppSecret
+# 可选：只允许这些 open_id 使用（逗号分隔）。留空 = 不限制。
+FEISHU_ALLOWED_OPEN_IDS=
+# 可选：群里被 @ 时才响应（单聊不受影响）。
+FEISHU_REQUIRE_MENTION_IN_GROUP=true
+```
+
+飞书开发者后台还需完成 4 步：① 添加「机器人」应用能力；② 权限管理开通 `im:message`、`im:message:send_as_bot`、`im:resource` 等；③ 事件与回调选择**长连接**并订阅 `im.message.receive_v1`；④ 版本管理与发布。
+
+> 安全边界完全不变：机器人只是「翻译层」，金额计算、业务校验与写入口令仍由确定性代码执行，飞书里同样要说「确认提交」才会写入。长连接需**单实例常驻**（会话与幂等状态在进程内存中）。完整步骤与踩坑记录见 `docs/飞书接入方案.md`。
 
 ## 四、验证
 
@@ -197,6 +225,7 @@ LLM_MODEL=qwen2.5:7b
 8. `api.py`：FastAPI 接口。
 9. `mcp_server.py`：MCP 工具暴露。
 10. `ui.py`：Streamlit 聊天演示页。
+11. `feishu_bot.py`：飞书长连接机器人适配层（飞书事件 → Agent → 回复，复用同一 Agent，安全边界不变）。
 
 ## 七、项目边界与生产化路线
 
