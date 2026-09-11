@@ -113,6 +113,8 @@ def _send_text(open_id: str, text: str) -> None:
     response = client.im.v1.message.create(request)
     if not response.success():
         print(f"[warn] 发送失败 code={response.code} msg={response.msg}")
+    else:
+        print(f"[info] 已发送文本 open_id={open_id} 长度={len(text)}")
 
 
 def _download_file(message_id: str, file_key: str, file_name: str) -> Path:
@@ -251,6 +253,7 @@ def _send_card(open_id: str, card: dict) -> bool:
     if not response.success():
         print(f"[warn] 卡片发送失败 code={response.code} msg={response.msg}")
         return False
+    print(f"[info] 已发送卡片 open_id={open_id}")
     return True
 
 
