@@ -8,9 +8,9 @@
 
 | 项目 | 当前状态 |
 |---|---|
-| 最后更新时间 | 2026-09-12 23:30（Asia/Shanghai） |
+| 最后更新时间 | 2026-09-13 00:05（Asia/Shanghai） |
 | 当前版本 | v0.6 面试交付强化版（开发中） |
-| 当前阶段 | S0-S1 已完成；当前执行 S2 ERP Adapter |
+| 当前阶段 | S0-S2 已完成；当前执行 S3 RBAC 与审批状态机 |
 | 当前开发分支 | `feat/interview-optimization-v1`（本地完整版本先开发验收，完成后再同步公开版） |
 | 主业务场景 | BOM → 采购 PO |
 | 目标受众 | FDE / AI 应用工程方向的作品展示 |
@@ -28,7 +28,7 @@
 |---|---|---|---|---|
 | S0 | 计划与分支 | 建立独立开发分支，登记完整路线和接续规则 | 已完成 | `b51fdbe` |
 | S1 | Git 与基线收口 | 处理已有 `start_feishu.cmd` 改动；日志文件不入库；统一 6/7 工具口径；全量测试通过 | 已完成 | `b3f7412`；58/58；eval 8/8 |
-| S2 | ERP Adapter | 抽象 ERP 端口；保留 SQLite Demo Adapter；新增可测试的 HTTP Adapter，覆盖超时、重试、鉴权、错误映射和幂等键 | 待开始 | - |
+| S2 | ERP Adapter | 抽象 ERP 端口；保留 SQLite Demo Adapter；新增可测试的 HTTP Adapter，覆盖超时、重试、鉴权、错误映射和幂等键 | 已完成 | `a94dd7a`；70/70 |
 | S3 | RBAC 与审批状态机 | viewer/operator/approver 权限；DRAFT→PENDING_APPROVAL→APPROVED→COMMITTED→ROLLED_BACK；发起人与审批人分离 | 待开始 | - |
 | S4 | Agent 安全评测 | 扩充确定性与模型评测，覆盖越权、提示注入、错误参数、重复/并发确认、服务异常，并输出指标报告 | 待开始 | - |
 | S5 | 可观测性 | JSON 结构化日志；request/session/action/tool 关联；工具耗时与错误类型；健康和指标查询 | 待开始 | - |
@@ -41,7 +41,8 @@
 - 已确认目录角色：`rongheng-erp-agent` 是本地完整开发与业务参考版本；`erp-procurement-agent` 是公开发布副本。
 - 所有实质开发先发生在本仓库；业务材料仅用于提炼抽象规则，禁止复制真实客户、合同、价格、账号或内部文件。
 - S1 已将改造启动前的 `start_feishu.cmd` 用户改动收口：控制台与文件双写、保留退出码、异常自动重启；`feishu_bot.log` 已忽略。
-- 下一步第一动作：定义 `ERPAdapter` 抽象协议，使工具层不再直接绑定 SQLite，并增加 Mock HTTP ERP 的失败重试与幂等验证。
+- S2 已新增 `ERPAdapter` 协议与 `HTTPERPAdapter`；默认继续使用 SQLite 合成数据，通过 `ERP_BACKEND=http` 才切客户测试 API；不声称已连接真实 ERP。
+- 下一步第一动作：为 S3 定义身份、角色、权限和审批状态迁移，先扩展 SQLite schema，再接 API/工具层与测试。
 
 ## 2. 项目目标
 
@@ -69,6 +70,7 @@
 - [x] Markdown 业务规则分块与离线检索；
 - [x] 可展示来源、章节、摘要和检索分数；
 - [x] SQLite 模拟 ERP 物料档案；
+- [x] 可替换 ERP Adapter：SQLite Demo 实现 + HTTP 客户 API 实现；HTTP 层含 Bearer 鉴权、超时、有界重试、稳定错误映射和 `Idempotency-Key`；
 - [x] 物料档案导入（`POST /materials/import` + MCP `import_materials` + UI 上传入口，白名单目录解析防路径穿越，模板见 `samples/物料档案模板.xlsx`）；
 - [x] 供应商、单价、包装费和币种查询；
 - [x] 采购 PO 草稿生成及总金额计算；
@@ -256,6 +258,17 @@
 ```
 
 ## 11. 工作日志
+
+### 2026-09-13 00:05
+
+- 本次目标：完成 S2 ERP Adapter，使 Agent 业务层不再绑定 SQLite，并为客户测试环境对接预留可验证接口。
+- 实际完成：① 新增 `ERPAdapter` Protocol，明确工具层依赖的最小 ERP 能力；② 现有 `ERPRepository` 作为结构化兼容的 SQLite Demo 实现；③ 新增 `HTTPERPAdapter`，实现 Bearer 鉴权、超时、指数退避、有界重试、URL 编码、稳定异常类型及写请求幂等键；④ API/MCP/飞书三入口统一从工厂选择后端；⑤ API 将 Adapter 异常映射为 404/409/502/503；⑥ 增加环境变量示例、架构说明与客户联调契约。
+- 改动文件：`erp_agent/adapters.py`、`erp_agent/agent.py`、`erp_agent/tools.py`、`api.py`、`mcp_server.py`、`feishu_bot.py`、`tests/test_adapters.py`、`docs/ERP_Adapter契约.md`、`.env.example`、`README.md`。
+- 验证命令与结果：单测由 58 增至 70，70/70 通过；新增 12 项覆盖默认/HTTP 工厂、`.env` 读取、鉴权头、超时与 5xx 重试、重试耗尽、401/409/其他错误、非 JSON、404 物料、稳定幂等键；`compileall` 与 `git diff --check` 通过。
+- 提交记录：`a94dd7a feat: add replaceable ERP adapter layer`。
+- 遇到的问题：MCP 入口原先不会主动加载 `.env`；工厂现统一安全加载项目配置，已有进程环境变量优先，不回显 Token。
+- 遗留问题：HTTP 契约为可替换集成层和离线模拟验证，尚未获得真实 ERP 授权或字段协议，不得描述成真实生产接入。
+- 下一步第一动作：开始 S3 RBAC 与审批状态机，实现发起人与审批人分离。
 
 ### 2026-09-12 23:42
 
