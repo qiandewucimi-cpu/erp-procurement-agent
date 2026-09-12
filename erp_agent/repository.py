@@ -19,8 +19,9 @@ class ERPRepository:
         self.initialize()
 
     def connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.db_path)
+        connection = sqlite3.connect(self.db_path, timeout=10)
         connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA busy_timeout=10000")
         return connection
 
     @contextmanager
@@ -124,6 +125,9 @@ class ERPRepository:
             row = con.execute("SELECT * FROM pending_actions WHERE action_id = ?", (action_id,)).fetchone()
             if not row:
                 raise KeyError("找不到待审批操作")
+            payload = json.loads(row["payload_json"])
+            if not payload.get("ready"):
+                raise ValueError("当前草稿存在阻断问题，禁止审批")
             if row["requested_by"] == approver:
                 raise ValueError("职责分离校验失败：发起人不能审批自己的操作")
             if row["status"] == "APPROVED":
@@ -142,6 +146,9 @@ class ERPRepository:
         if confirmation != "确认提交":
             raise ValueError("安全校验失败：请输入“确认提交”")
         with self.session() as con:
+            # 先取得写锁再读取状态，避免并发确认都看到“尚未创建”后争抢唯一键。
+            # 后到请求会等待首个事务提交，再返回同一 PO 的幂等结果。
+            con.execute("BEGIN IMMEDIATE")
             row = con.execute("SELECT * FROM pending_actions WHERE action_id = ?", (action_id,)).fetchone()
             if not row:
                 raise KeyError("找不到待确认操作")

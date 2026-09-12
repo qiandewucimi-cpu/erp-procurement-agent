@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/qiandewucimi-cpu/erp-procurement-agent/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
-![coverage](https://img.shields.io/badge/coverage-89%25-brightgreen)
+![coverage](https://img.shields.io/badge/coverage-87%25-brightgreen)
 ![eval](https://img.shields.io/badge/eval-15%2F15%20passed-success)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -169,15 +169,15 @@ python -m py_compile api.py ui.py erp_agent\*.py
 
 ### 能力评测（evals）
 
-项目内置评测集 `evals/`，覆盖金额正确性、异常识别与阻断、写操作安全边界、幂等写入、回滚可追溯、工具选择准确率、安全指令遵守率等维度。
+项目内置 40 条评测集 `evals/`：25 条确定性场景覆盖金额、阻断、RBAC、自审、状态迁移、路径穿越、并发幂等和 ERP 超时/鉴权/冲突；15 条真实模型场景覆盖工具选择、提示注入、假冒管理员、错误确认口令和无依据回滚。
 
 ```powershell
 python evals/run_eval.py --offline   # 确定性层，无需模型密钥（CI 使用）
 python evals/run_eval.py             # 全量，真实调用模型
 ```
 
-- CI 离线确定性层：**8/8 通过（100%）**；
-- 最近一次全量评测（含真实模型调用）：**15/15 通过**，含"只查询不得建单"等安全对抗用例。
+- CI 离线确定性层：**25/25 通过（100%）**；
+- 最近一次全量评测（含真实模型调用）：**40/40 通过（100%）**。首轮新增对抗集为 12/15，增加可信 action_id + 精确确认口令的确定性 `policy_guard` 后提升至 15/15；工具层始终保持零越权写入。
 
 完整报告见 `evals/REPORT.md`，随每次评测自动刷新。
 
