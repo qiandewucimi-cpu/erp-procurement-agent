@@ -8,9 +8,9 @@
 
 | 项目 | 当前状态 |
 |---|---|
-| 最后更新时间 | 2026-09-13 00:38（Asia/Shanghai） |
+| 最后更新时间 | 2026-09-13 00:50（Asia/Shanghai） |
 | 当前版本 | v0.6 面试交付强化版（开发中） |
-| 当前阶段 | S0-S3 已完成；当前执行 S4 Agent 安全评测扩充 |
+| 当前阶段 | S0-S4 已完成；当前执行 S5 可观测性 |
 | 当前开发分支 | `feat/interview-optimization-v1`（本地完整版本先开发验收，完成后再同步公开版） |
 | 主业务场景 | BOM → 采购 PO |
 | 目标受众 | FDE / AI 应用工程方向的作品展示 |
@@ -30,7 +30,7 @@
 | S1 | Git 与基线收口 | 处理已有 `start_feishu.cmd` 改动；日志文件不入库；统一 6/7 工具口径；全量测试通过 | 已完成 | `b3f7412`；58/58；eval 8/8 |
 | S2 | ERP Adapter | 抽象 ERP 端口；保留 SQLite Demo Adapter；新增可测试的 HTTP Adapter，覆盖超时、重试、鉴权、错误映射和幂等键 | 已完成 | `a94dd7a`；70/70 |
 | S3 | RBAC 与审批状态机 | viewer/operator/approver 权限；DRAFT→PENDING_APPROVAL→APPROVED→COMMITTED→ROLLED_BACK；发起人与审批人分离 | 已完成 | `6e6ad43`；82/82；MCP 8 工具 |
-| S4 | Agent 安全评测 | 扩充确定性与模型评测，覆盖越权、提示注入、错误参数、重复/并发确认、服务异常，并输出指标报告 | 待开始 | - |
+| S4 | Agent 安全评测 | 扩充确定性与模型评测，覆盖越权、提示注入、错误参数、重复/并发确认、服务异常，并输出指标报告 | 已完成 | `38aada9`；25/25 offline；40/40 full |
 | S5 | 可观测性 | JSON 结构化日志；request/session/action/tool 关联；工具耗时与错误类型；健康和指标查询 | 待开始 | - |
 | S6 | 面试交付材料 | 更新架构图；补需求范围、ADR、安全清单、验收、部署、排障、试点与回滚材料；完成 5 分钟演示脚本 | 待开始 | - |
 | S7 | 简历校准 | 依据最终已验证事实重写项目表述，不提前写未完成能力 | 待开始 | - |
@@ -43,7 +43,8 @@
 - S1 已将改造启动前的 `start_feishu.cmd` 用户改动收口：控制台与文件双写、保留退出码、异常自动重启；`feishu_bot.log` 已忽略。
 - S2 已新增 `ERPAdapter` 协议与 `HTTPERPAdapter`；默认继续使用 SQLite 合成数据，通过 `ERP_BACKEND=http` 才切客户测试 API；不声称已连接真实 ERP。
 - S3 已实现可选 RBAC、入口身份绑定、8 工具、审批队列和职责分离；默认关闭以兼容离线 Demo，开启后 API/飞书/MCP 均需绑定身份。
-- 下一步第一动作：扩充 `evals/cases.json` 与评测执行器，优先加入越权、提示注入、状态机、并发确认和 Adapter 失败用例。
+- S4 已形成 40 条评测集与报告；新增确定性 `policy_guard` 只信任工具返回的 action_id，并要求精确确认口令；四路并发确认缺陷已修复。
+- 下一步第一动作：实现 S5 结构化日志上下文与内存指标，贯穿 API→Agent→Tool→Adapter，并提供 `/metrics` 查询。
 
 ## 2. 项目目标
 
@@ -261,6 +262,17 @@
 ```
 
 ## 11. 工作日志
+
+### 2026-09-13 00:50
+
+- 本次目标：完成 S4 Agent 安全评测扩充，让安全、权限、韧性和并发能力都能自动复现，而非只靠文档描述。
+- 实际完成：① 评测集由 15 条扩至 40 条：25 条确定性 + 15 条真实模型；② 新增 authorization/approval/resilience/concurrency/input_security 维度；③ 评测器支持跨工具状态机、四线程并发与 HTTP Adapter 故障场景；④ 新增 `policy_guard`，审批/提交/回滚只接受会话中工具真实返回的 action_id，确认必须是当前消息完整的“确认提交”；⑤ 修复并发确认竞态，SQLite 使用 `BEGIN IMMEDIATE` 与 busy timeout，让后到请求返回同一 PO 的幂等成功结果；⑥ README 与评测报告同步。
+- 改动文件：`evals/cases.json`、`evals/run_eval.py`、`evals/results.json`、`evals/REPORT.md`、`erp_agent/llm.py`、`erp_agent/tools.py`、`erp_agent/repository.py`、`tests/test_agent_loop.py`、`README.md`。
+- 验证命令与结果：离线确定性 25/25；真实模型首轮新增对抗集 12/15，强化系统提示后 14/15，加入确定性 policy guard 后 15/15；最终合并 40/40；单测 85/85；覆盖率 87%；编译通过。
+- 提交记录：`38aada9 test: expand agent safety evaluation to 40 cases`。
+- 遇到的问题：D16 首次暴露四路并发确认仅 1 路返回成功，唯一约束虽防重复但调用体验不幂等；已改为写锁串行后 4 路成功、唯一 PO=1。模型首轮仍尝试危险工具但工具层未写入；policy guard 将阻断点前移到工具执行之前。
+- 遗留问题：真实模型评测会受模型版本与网络波动影响；CI 默认只跑 25 条确定性层，完整 40 条报告需配置模型后手动复跑。
+- 下一步第一动作：开始 S5，加入 request/session/action/tool 关联日志和可查询指标。
 
 ### 2026-09-13 00:38
 
