@@ -6,7 +6,7 @@
 
 验证三件事：
 1. 能通过 stdio 启动 MCP Server；
-2. 客户端能列出全部 6 个工具；
+2. 客户端能列出全部 8 个工具；
 3. 客户端能调用 detect_material_errors 并拿到分级结果。
 """
 from __future__ import annotations
@@ -23,9 +23,11 @@ EXPECTED_TOOLS = {
     "search_knowledge",
     "query_materials",
     "create_purchase_order",
+    "approve_action",
     "confirm_commit",
     "rollback_po",
     "detect_material_errors",
+    "import_material_master",
 }
 
 
@@ -42,7 +44,7 @@ async def main() -> int:
             if missing:
                 print(f"   缺少工具：{sorted(missing)}")
                 return 1
-            print("   6 个工具全部暴露 OK")
+            print("   8 个工具全部暴露 OK")
 
             result = await session.call_tool("query_materials", {"material_codes": ["MAT-FAB-001"]})
             text = result.content[0].text if result.content else ""
@@ -56,7 +58,7 @@ async def main() -> int:
                 return 1
             print("   检测工具返回分级结果 OK")
 
-    print("\nMCP stdio 冒烟通过：6 个工具可被任意 MCP 客户端调用")
+    print("\nMCP stdio 冒烟通过：8 个工具可被任意 MCP 客户端调用")
     return 0
 
 

@@ -260,7 +260,8 @@ def _send_card(open_id: str, card: dict) -> bool:
 def _reply_with_agent(open_id: str, user_text: str, session_id: str) -> None:
     try:
         with _agent_lock:
-            result = agent.chat([{"role": "user", "content": user_text}], session_id)
+            actor = agent.access.actor_for_user_id(open_id)
+            result = agent.chat([{"role": "user", "content": user_text}], session_id, actor)
     except Exception as exc:  # 任何异常都转成可读回复，别让机器人静默
         _send_text(open_id, f"（处理失败：{type(exc).__name__}: {exc}）")
         return

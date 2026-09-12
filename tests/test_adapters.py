@@ -109,6 +109,14 @@ class HTTPERPAdapterTest(unittest.TestCase):
         self.assertTrue(call["url"].endswith("/actions/ACT-001/confirm"))
         self.assertEqual(call["headers"]["Idempotency-Key"], "erp-agent:confirm:ACT-001")
 
+    def test_approve_sends_bound_identity_and_idempotency_key(self):
+        adapter, session, _ = self.adapter(FakeResponse(200, {"status": "APPROVED"}))
+        result = adapter.approve("ACT-001", "approver-1")
+        self.assertEqual(result["status"], "APPROVED")
+        call = session.calls[0]
+        self.assertEqual(call["json"]["approver"], "approver-1")
+        self.assertEqual(call["headers"]["Idempotency-Key"], "erp-agent:approve:ACT-001")
+
     def test_preview_idempotency_key_is_deterministic(self):
         adapter, session, _ = self.adapter(
             FakeResponse(200, {"action_id": "ACT-1"}),

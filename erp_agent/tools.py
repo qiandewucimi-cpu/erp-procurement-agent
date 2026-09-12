@@ -7,6 +7,7 @@ from .adapters import ERPAdapter
 from .knowledge import KnowledgeBase
 from .models import ValidationIssue
 from .parser import parse_bom, parse_materials
+from .security import AccessController, Actor
 from .validator import MaterialAuditor
 
 
@@ -27,6 +28,7 @@ class ToolRegistry:
         knowledge: KnowledgeBase,
         samples_dir: Path,
         uploads_dir: Path | None = None,
+        access_controller: AccessController | None = None,
     ):
         self.repository = repository
         self.knowledge = knowledge
@@ -34,6 +36,7 @@ class ToolRegistry:
         # 用户上传目录：默认与 samples 同级，可通过参数覆盖（容器/测试场景）
         self.uploads_dir = Path(uploads_dir) if uploads_dir else self.samples_dir.parent / "uploads"
         self.auditor = MaterialAuditor(repository)
+        self.access = access_controller or AccessController.from_env()
 
     def resolve_bom_file(self, filename: str) -> Path:
         """在 samples/ 与 uploads/ 两个白名单目录内解析 BOM 文件。
@@ -90,6 +93,20 @@ class ToolRegistry:
             {
                 "type": "function",
                 "function": {
+                    "name": "approve_action",
+                    "description": "审批一项由其他人发起的采购 PO 草稿。发起人不能审批自己的操作；审批后仍需明确确认才会写入。",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "action_id": {"type": "string", "description": "create_purchase_order 返回的 action_id"},
+                        },
+                        "required": ["action_id"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "search_knowledge",
                     "description": "检索采购 PO 的业务规则库，了解字段含义、校验规则和安全要求。生成或校验采购单前应先调用它。",
                     "parameters": {
@@ -143,7 +160,6 @@ class ToolRegistry:
                         "properties": {
                             "action_id": {"type": "string", "description": "create_purchase_order 返回的 action_id"},
                             "confirmation": {"type": "string", "description": "用户输入的确认口令，必须是「确认提交」"},
-                            "operator": {"type": "string", "description": "操作人，默认 demo_user"},
                         },
                         "required": ["action_id", "confirmation"],
                     },
@@ -159,7 +175,6 @@ class ToolRegistry:
                         "properties": {
                             "action_id": {"type": "string", "description": "要回滚的 action_id"},
                             "reason": {"type": "string", "description": "回滚原因"},
-                            "operator": {"type": "string", "description": "操作人，默认 demo_user"},
                         },
                         "required": ["action_id", "reason"],
                     },
@@ -200,11 +215,12 @@ class ToolRegistry:
     # ------------------------------------------------------------------ #
     # 工具实现（返回 JSON 字符串，供模型继续编排）
     # ------------------------------------------------------------------ #
-    def call(self, name: str, arguments: dict) -> str:
+    def call(self, name: str, arguments: dict, actor: Actor | None = None) -> str:
         handler = {
             "search_knowledge": self._search_knowledge,
             "query_materials": self._query_materials,
             "create_purchase_order": self._create_purchase_order,
+            "approve_action": self._approve_action,
             "confirm_commit": self._confirm_commit,
             "rollback_po": self._rollback_po,
             "detect_material_errors": self._detect_material_errors,
@@ -213,7 +229,11 @@ class ToolRegistry:
         if handler is None:
             return json.dumps({"ok": False, "error": f"未知工具：{name}"}, ensure_ascii=False)
         try:
-            return handler(arguments)
+            self.access.authorize(actor, name)
+            bound = dict(arguments)
+            if actor is not None:
+                bound["operator"] = actor.user_id
+            return handler(bound)
         except Exception as exc:  # 工具内部异常也转成可读 JSON，不让循环崩溃
             return json.dumps({"ok": False, "error": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False)
 
@@ -319,7 +339,8 @@ class ToolRegistry:
         }
 
         payload = {"ready": ready, "draft": draft, "issues": [issue.model_dump() for issue in issues]}
-        action_id = self.repository.create_pending(payload)
+        operator = str(args.get("operator", "demo_operator"))
+        action_id = self.repository.create_pending(payload, operator)
         return json.dumps(
             {
                 "ok": True,
@@ -333,10 +354,19 @@ class ToolRegistry:
             ensure_ascii=False,
         )
 
+    def _approve_action(self, args: dict) -> str:
+        action_id = str(args.get("action_id", ""))
+        approver = str(args.get("operator", "demo_approver"))
+        try:
+            result = self.repository.approve(action_id, approver)
+            return json.dumps({"ok": True, **result}, ensure_ascii=False)
+        except (ValueError, KeyError) as exc:
+            return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
+
     def _confirm_commit(self, args: dict) -> str:
         action_id = str(args.get("action_id", ""))
         confirmation = str(args.get("confirmation", ""))
-        operator = str(args.get("operator", "demo_user"))
+        operator = str(args.get("operator", "demo_approver"))
         try:
             result = self.repository.confirm(action_id, confirmation, operator)
             return json.dumps({"ok": True, **result}, ensure_ascii=False)
@@ -346,7 +376,7 @@ class ToolRegistry:
     def _rollback_po(self, args: dict) -> str:
         action_id = str(args.get("action_id", ""))
         reason = str(args.get("reason", ""))
-        operator = str(args.get("operator", "demo_user"))
+        operator = str(args.get("operator", "demo_approver"))
         try:
             result = self.repository.rollback(action_id, reason, operator)
             return json.dumps({"ok": True, **result}, ensure_ascii=False)

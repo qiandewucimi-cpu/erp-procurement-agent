@@ -195,8 +195,9 @@ AGENT_SYSTEM_PROMPT = (
     "1. 你只能调用给定的工具，不要凭空编造物料、价格或单号。\n"
     "2. 金额、业务校验和最终写入由工具内部完成，你不要自己计算或断言金额。\n"
     "3. 生成采购单后，必须先停下来，把 action_id、金额、校验问题告诉用户，等待用户输入「确认提交」后才调用 confirm_commit。\n"
-    "4. 用户只是想查价格时，用 query_materials，不要建单。\n"
-    "5. 用简体中文、口语化、简洁地回复用户。"
+    "4. 启用权限控制时，操作员只能发起草稿；审批人用 approve_action 审批他人发起的操作，再用 confirm_commit 写入。工具会拒绝越权和自审。\n"
+    "5. 用户只是想查价格时，用 query_materials，不要建单。\n"
+    "6. 用简体中文、口语化、简洁地回复用户。"
 )
 
 
@@ -236,7 +237,7 @@ class AgentLoop:
         response.raise_for_status()
         return response.json()["choices"][0]["message"]
 
-    def run(self, messages: list[dict], tool_registry, max_steps: int = 8) -> tuple[str, list[dict], list[dict]]:
+    def run(self, messages: list[dict], tool_registry, max_steps: int = 8, actor=None) -> tuple[str, list[dict], list[dict]]:
         """执行工具循环，返回 (最终回复文本, 工具调用轨迹, 完整消息历史)。
 
         - 轨迹每项：{"step": int, "tool": str, "arguments": dict, "result": str}
@@ -277,7 +278,7 @@ class AgentLoop:
                     arguments = json.loads(tc["function"]["arguments"] or "{}")
                 except json.JSONDecodeError:
                     arguments = {}
-                result = tool_registry.call(name, arguments)
+                result = tool_registry.call(name, arguments) if actor is None else tool_registry.call(name, arguments, actor=actor)
                 trace.append({"step": len(trace) + 1, "tool": name, "arguments": arguments, "result": result})
                 msgs.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
 

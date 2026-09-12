@@ -1,17 +1,29 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 
 from mcp.server.fastmcp import FastMCP
 
 from erp_agent.adapters import build_erp_adapter
 from erp_agent.knowledge import KnowledgeBase
 from erp_agent.tools import ToolRegistry
+from erp_agent.security import AccessController
 
 
 BASE_DIR = Path(__file__).resolve().parent
 repository = build_erp_adapter(BASE_DIR)
-tools = ToolRegistry(repository, KnowledgeBase(BASE_DIR / "knowledge"), BASE_DIR / "samples")
+access = AccessController.from_env()
+tools = ToolRegistry(repository, KnowledgeBase(BASE_DIR / "knowledge"), BASE_DIR / "samples", access_controller=access)
+
+
+def _actor():
+    token = os.getenv("ERP_MCP_API_TOKEN", "")
+    return access.authenticate(f"Bearer {token}" if token else None)
+
+
+def _call(name: str, arguments: dict) -> str:
+    return tools.call(name, arguments, actor=_actor())
 
 mcp = FastMCP(
     "erp-procurement-agent",
@@ -22,43 +34,49 @@ mcp = FastMCP(
 @mcp.tool()
 def search_knowledge(query: str) -> str:
     """检索采购 PO 业务规则库，了解字段含义、校验规则与安全要求。"""
-    return tools.call("search_knowledge", {"query": query})
+    return _call("search_knowledge", {"query": query})
 
 
 @mcp.tool()
 def query_materials(material_codes: list[str]) -> str:
     """查询物料档案、供应商、单价与包装费（只读，不生成单据）。"""
-    return tools.call("query_materials", {"material_codes": material_codes})
+    return _call("query_materials", {"material_codes": material_codes})
 
 
 @mcp.tool()
 def create_purchase_order(filename: str) -> str:
     """根据 BOM 文件生成采购 PO 草稿。只生成待确认预览，不会真正写入。"""
-    return tools.call("create_purchase_order", {"filename": filename})
+    return _call("create_purchase_order", {"filename": filename})
 
 
 @mcp.tool()
-def confirm_commit(action_id: str, confirmation: str, operator: str = "demo_user") -> str:
+def approve_action(action_id: str) -> str:
+    """审批其他操作员发起的采购 PO 草稿；发起人不能自审。"""
+    return _call("approve_action", {"action_id": action_id})
+
+
+@mcp.tool()
+def confirm_commit(action_id: str, confirmation: str) -> str:
     """把采购 PO 草稿真正写入模拟 ERP。仅当 confirmation 为「确认提交」时才成功。"""
-    return tools.call("confirm_commit", {"action_id": action_id, "confirmation": confirmation, "operator": operator})
+    return _call("confirm_commit", {"action_id": action_id, "confirmation": confirmation})
 
 
 @mcp.tool()
-def rollback_po(action_id: str, reason: str, operator: str = "demo_user") -> str:
+def rollback_po(action_id: str, reason: str) -> str:
     """回滚一张已写入的采购 PO，状态标记为 ROLLED_BACK，审计记录仍保留。"""
-    return tools.call("rollback_po", {"action_id": action_id, "reason": reason, "operator": operator})
+    return _call("rollback_po", {"action_id": action_id, "reason": reason})
 
 
 @mcp.tool()
 def detect_material_errors(filename: str, min_level: str = "warning", push: bool = False) -> str:
     """检测 BOM 物料错误（未建档/名称不一致/数量非法/单价缺失/包装费缺失/供应商缺失），分级生成报告；push=true 时写入推送队列。"""
-    return tools.call("detect_material_errors", {"filename": filename, "min_level": min_level, "push": push})
+    return _call("detect_material_errors", {"filename": filename, "min_level": min_level, "push": push})
 
 
 @mcp.tool()
 def import_material_master(filename: str) -> str:
     """把用户的物料档案表（Excel/CSV）导入模拟 ERP 的物料主数据，已存在的编码则更新价格。导入后再用自己的 BOM 才不会被判为「未建档」。"""
-    return tools.call("import_material_master", {"filename": filename})
+    return _call("import_material_master", {"filename": filename})
 
 
 if __name__ == "__main__":

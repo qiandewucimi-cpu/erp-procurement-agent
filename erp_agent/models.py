@@ -32,6 +32,11 @@ class ConfirmRequest(BaseModel):
     operator: str = "demo_user"
 
 
+class ApprovalRequest(BaseModel):
+    action_id: str
+    approver: str = "demo_approver"
+
+
 class RollbackRequest(BaseModel):
     action_id: str
     reason: str = Field(min_length=2)
@@ -67,4 +72,3 @@ class PrepareResponse(BaseModel):
     issues: list[ValidationIssue]
     citations: list[Citation]
     tool_trace: list[ToolStep]
-

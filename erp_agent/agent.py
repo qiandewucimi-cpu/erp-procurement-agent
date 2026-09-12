@@ -8,6 +8,7 @@ from .knowledge import KnowledgeBase
 from .llm import AgentLoop, IntentClassifier
 from .models import Citation, PrepareResponse, ToolStep, ValidationIssue
 from .parser import parse_bom
+from .security import AccessController, Actor
 from .tools import ToolRegistry
 
 
@@ -26,16 +27,18 @@ class PurchasePOAgent:
         samples_dir: Path,
         intent_classifier: IntentClassifier | None = None,
         agent_loop: AgentLoop | None = None,
+        access_controller: AccessController | None = None,
     ):
         self.repository = repository
         self.knowledge = knowledge
         self.samples_dir = samples_dir
         self.intent_classifier = intent_classifier or IntentClassifier()
-        self.tools = ToolRegistry(repository, knowledge, samples_dir)
+        self.access = access_controller or AccessController.from_env()
+        self.tools = ToolRegistry(repository, knowledge, samples_dir, access_controller=self.access)
         self.loop = agent_loop or AgentLoop()
         self.sessions: dict[str, list[dict]] = {}
 
-    def chat(self, messages: list[dict], session_id: str | None = None) -> dict:
+    def chat(self, messages: list[dict], session_id: str | None = None, actor: Actor | None = None) -> dict:
         """多轮对话入口：模型自主调用工具完成采购业务。
 
         messages 为 OpenAI 格式对话历史（含 role 与 content）。
@@ -46,7 +49,7 @@ class PurchasePOAgent:
             full = self.sessions[session_id] + list(messages)
         else:
             full = list(messages)
-        reply, trace, full = self.loop.run(full, self.tools)
+        reply, trace, full = self.loop.run(full, self.tools, actor=actor)
         if session_id:
             self.sessions[session_id] = full
         desc_map = {s["function"]["name"]: s["function"]["description"] for s in self.tools.schemas}
@@ -59,7 +62,8 @@ class PurchasePOAgent:
             "llm_enabled": self.loop.enabled,
         }
 
-    def prepare(self, task: str, filename: str, content_base64: str | None = None) -> PrepareResponse:
+    def prepare(self, task: str, filename: str, content_base64: str | None = None, actor: Actor | None = None) -> PrepareResponse:
+        self.access.authorize(actor, "prepare")
         trace: list[ToolStep] = []
         issues: list[ValidationIssue] = []
 
@@ -152,7 +156,7 @@ class PurchasePOAgent:
         trace.append(ToolStep(step=5, tool="validate_purchase_po", purpose="执行必填、档案、供应商和币种校验", result="通过，可等待确认" if ready else "存在阻断问题，禁止写入"))
 
         payload = {"ready": ready, "draft": draft, "issues": [issue.model_dump() for issue in issues]}
-        action_id = self.repository.create_pending(payload)
+        action_id = self.repository.create_pending(payload, actor.user_id if actor else "demo_operator")
         trace.append(ToolStep(step=6, tool="create_change_preview", purpose="保存变更预览而不写入正式业务表", result=f"生成待确认操作 {action_id}"))
         return PrepareResponse(
             action_id=action_id,

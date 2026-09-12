@@ -32,9 +32,11 @@ Token 只从环境变量读取，不进入源码、日志、测试夹具或提�
 | GET | `/materials` | 查询物料列表 | 只读 |
 | POST | `/materials/import` | 导入物料主数据 | 请求内容哈希 |
 | POST | `/actions/preview` | 保存写前预览 | 预览内容与操作人哈希 |
+| POST | `/actions/{action_id}/approve` | 审批其他人发起的草稿 | `action_id` |
 | POST | `/actions/{action_id}/confirm` | 确认写入 | `action_id` |
 | POST | `/actions/{action_id}/rollback` | 回滚 | `action_id` |
 | GET | `/orders` | 查询采购单 | 只读 |
+| GET | `/approvals` | 查询草稿与审批状态 | 只读 |
 | GET | `/audit` | 查询审计日志 | 只读 |
 | POST | `/error-reports` | 保存错误报告 | 报告内容哈希 |
 | GET | `/error-reports` | 查询错误报告 | 只读 |

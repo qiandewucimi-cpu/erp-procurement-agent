@@ -6,7 +6,7 @@
 ![eval](https://img.shields.io/badge/eval-15%2F15%20passed-success)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-这是一个面向 FDE / AI 应用工程岗位的可运行作品：用完全合成的数据还原“BOM → 采购 PO”流程，展示**工具调用循环 Agent**（Function Calling）、多轮对话、MCP 工具暴露、RAG 检索、业务校验、写前确认、幂等、审计和回滚，并配套**可复现的能力评测集**。
+这是一个面向 FDE / AI 应用工程岗位的可运行作品：用完全合成的数据还原“BOM → 采购 PO”流程，展示**工具调用循环 Agent**（Function Calling）、多轮对话、MCP 工具暴露、RAG 检索、ERP Adapter、RBAC、职责分离、审批状态机、幂等、审计和回滚，并配套**可复现的能力评测集**。
 
 项目当前进度、问题、缺口和下一步统一记录在 `PROJECT_STATUS.md`。每次实质改动结束前都应同步更新该文件。
 
@@ -16,7 +16,7 @@
 
 1. 用自然语言对话：「帮我根据 `正常示例_BOM.xlsx` 生成采购 PO 草稿，先给我看金额」。
 2. 模型自主决定调用工具（可展开看工具调用轨迹），生成草稿并停下等确认。
-3. 输入 `确认提交`，模型才会调用写入工具；重复确认不会重复建单。
+3. 安全模式下由 operator 发起、approver 审批；输入 `确认提交` 后才写入，重复确认不会重复建单。
 4. 追问「查一下 MAT-FAB-001 的价格」——模型只查询、不建单，体会 agent 的多轮能力。
 5. 切到“订单与审计”查看操作记录，再演示回滚。
 6. 换成 `异常示例_BOM.xlsx`，展示未建档物料和非法数量如何阻止写入。
@@ -32,12 +32,14 @@ flowchart TB
     LOOP --> SK[search_knowledge<br/>规则检索]
     LOOP --> QM[query_materials<br/>物料/价格查询 · 只读]
     LOOP --> CP[create_purchase_order<br/>生成草稿预览]
-    LOOP --> CC[confirm_commit<br/>写入 · 需口令 · 幂等]
+    LOOP --> AP[approve_action<br/>审批 · 禁止自审]
+    LOOP --> CC[confirm_commit<br/>写入 · RBAC · 幂等]
     LOOP --> RB[rollback_po<br/>回滚]
     LOOP --> DM[detect_material_errors<br/>物料错误分级]
     LOOP --> IM[import_material_master<br/>物料档案导入]
     QM --> ADAPTER{ERP Adapter}
     CP --> ADAPTER
+    AP --> ADAPTER
     CC --> ADAPTER
     RB --> ADAPTER
     DM --> ADAPTER
@@ -45,12 +47,14 @@ flowchart TB
     ADAPTER --> DB[(SQLite 合成数据)]
     ADAPTER -.客户测试环境.-> HTTP[客户 ERP HTTP API]
     SK --> KB[(Markdown 规则库)]
-    MCP[MCP Server<br/>mcp_server.py] -.->|暴露 7 个标准工具| EXT[任意 MCP 客户端]
+    MCP[MCP Server<br/>mcp_server.py] -.->|暴露 8 个标准工具| EXT[任意 MCP 客户端]
 ```
 
 核心设计是「受控工具调用 Agent」：模型通过 Function Calling 自主决定调用哪个工具、传什么参数、调用顺序与次数，因此具备 agent 的多轮、自主编排能力；但**金额计算、业务校验和写入口令始终由确定性代码完成**，模型只做编排不做决定。断网或模型幻觉都不会造成错误写入。
 
 业务层通过 `ERPAdapter` 与具体系统解耦：默认 `SQLite` 实现保证离线演示稳定；`HTTPERPAdapter` 展示客户 API 联调所需的 Bearer 鉴权、超时、有界重试、稳定错误映射和幂等请求头。接口契约和联调边界见 [`docs/ERP_Adapter契约.md`](docs/ERP_Adapter契约.md)。这只是可替换集成层，不声称已连接真实企业 ERP。
+
+可选安全模式把 Token 绑定为 viewer/operator/approver，模型看不到也不能伪造操作人；发起人与审批人强制分离，状态按 DRAFT → PENDING_APPROVAL → APPROVED → COMMITTED → ROLLED_BACK 留下审计。配置和边界见 [`docs/权限与审批状态机.md`](docs/权限与审批状态机.md)。
 
 ## 三、本地启动
 
@@ -104,7 +108,7 @@ python smoke_docker.py
 > ```
 > 注意：给 daemon 配代理通常无效，因为代理软件一般只监听 `127.0.0.1`，WSL2 经 NAT 访问不到。
 
-MCP 工具也可单独验证（stdio 协议，7 个工具）：
+MCP 工具也可单独验证（stdio 协议，8 个工具）：
 
 ```powershell
 python smoke_mcp.py
@@ -211,31 +215,35 @@ LLM_MODEL=qwen2.5:7b
 | GET | `/health` | 健康检查 + `llm_enabled`/`llm_model`（可判断模型是否真在工作）|
 | POST | `/agent/chat` | 多轮对话：模型自主编排工具完成采购业务 |
 | POST | `/agent/prepare` | 确定性六步流水线（离线兼容） |
+| POST | `/agent/approve` | approver 审批其他人发起的草稿 |
 | POST | `/agent/confirm` | 使用明确口令确认写入 |
 | POST | `/agent/rollback` | 回滚已写入的采购 PO |
 | POST | `/agent/detect` | 物料错误检测：解析 BOM → 逐行校验 → 分级报告 |
 | GET | `/orders` | 查看模拟 ERP 单据 |
+| GET | `/approvals` | 查看草稿、审批人与状态迁移 |
 | GET | `/audit` | 查看审计日志 |
 | GET | `/error_reports` | 查看物料错误报告推送队列 |
 | GET | `/samples` | 列出可用示例文件 |
 | GET | `/materials` | 列出模拟 ERP 物料档案 |
 | POST | `/materials/import` | 导入物料档案（已存在编码则更新价格） |
 
-另有 `mcp_server.py`：把 7 个工具暴露为标准 MCP 工具，可接入任意 MCP 客户端（Claude Desktop、Cursor 等）。
+另有 `mcp_server.py`：把 8 个工具暴露为标准 MCP 工具，可接入任意 MCP 客户端（Claude Desktop、Cursor 等）。
 
 ## 六、代码阅读顺序
 
-1. `erp_agent/tools.py`：7 个业务工具的 schema 与确定性实现（金额/校验/口令都在这里）。
+1. `erp_agent/tools.py`：8 个业务工具的 schema 与确定性实现（金额/校验/权限/口令都在这里）。
 2. `erp_agent/llm.py`：`AgentLoop` 工具调用循环 + `IntentClassifier` 意图识别。
 3. `erp_agent/agent.py`：`chat()` 多轮入口 + `prepare()` 兼容流水线。
 4. `erp_agent/parser.py`：BOM 与物料档案（.xlsx/.csv）解析、表头别名归一。
 5. `erp_agent/knowledge.py`：离线 RAG 检索和来源返回。
 6. `erp_agent/repository.py`：SQLite、预览、幂等、审计和回滚。
-7. `erp_agent/validator.py`：物料错误检测的确定性校验与分级。
-8. `api.py`：FastAPI 接口。
-9. `mcp_server.py`：MCP 工具暴露。
-10. `ui.py`：Streamlit 聊天演示页。
-11. `feishu_bot.py`：飞书长连接机器人适配层（飞书事件 → Agent → 回复，复用同一 Agent，安全边界不变）。
+7. `erp_agent/adapters.py`：SQLite/HTTP ERP 可替换端口、重试和错误映射。
+8. `erp_agent/security.py`：身份绑定、RBAC 与入口权限。
+9. `erp_agent/validator.py`：物料错误检测的确定性校验与分级。
+10. `api.py`：FastAPI 接口。
+11. `mcp_server.py`：MCP 工具暴露。
+12. `ui.py`：Streamlit 聊天演示页。
+13. `feishu_bot.py`：飞书长连接机器人适配层（飞书事件 → Agent → 回复，复用同一 Agent，安全边界不变）。
 
 ## 七、项目边界与生产化路线
 
