@@ -61,9 +61,9 @@
 ### 3.1 核心后端
 
 - [x] FastAPI 服务与健康检查；
-- [x] 工具调用循环 Agent：模型通过 Function Calling 自主编排 6 个工具（search_knowledge / query_materials / create_purchase_order / confirm_commit / rollback_po / detect_material_errors）；
+- [x] 工具调用循环 Agent：模型通过 Function Calling 自主编排 7 个工具（search_knowledge / query_materials / create_purchase_order / confirm_commit / rollback_po / detect_material_errors / import_material_master）；
 - [x] 多轮对话：`/agent/chat` 接口 + session 记忆（模型能记住上一轮的 action_id）；
-- [x] MCP 工具暴露：`mcp_server.py` 用 FastMCP 把 6 个工具暴露为标准 MCP 工具（已做 stdio 真实冒烟）；
+- [x] MCP 工具暴露：`mcp_server.py` 用 FastMCP 把 7 个工具暴露为标准 MCP 工具（已做 stdio 真实冒烟）；
 - [x] 意图识别：可选 LLM（本地 Ollama / 云端千问·智谱），失败自动回退确定性规则；
 - [x] BOM `.xlsx` / `.xlsm` / `.csv` 解析；
 - [x] Markdown 业务规则分块与离线检索；
