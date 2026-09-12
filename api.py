@@ -1,8 +1,17 @@
 import json
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 
+from erp_agent.adapters import (
+    ERPAdapterError,
+    ERPAuthenticationError,
+    ERPConflictError,
+    ERPNotFoundError,
+    ERPUnavailableError,
+    build_erp_adapter,
+)
 from erp_agent.agent import PurchasePOAgent
 from erp_agent.knowledge import KnowledgeBase
 from erp_agent.models import (
@@ -18,7 +27,7 @@ from erp_agent.repository import ERPRepository
 
 
 BASE_DIR = Path(__file__).resolve().parent
-repository = ERPRepository(BASE_DIR / "data" / "demo_erp.db")
+repository = build_erp_adapter(BASE_DIR)
 agent = PurchasePOAgent(repository, KnowledgeBase(BASE_DIR / "knowledge"), BASE_DIR / "samples")
 
 app = FastAPI(
@@ -26,6 +35,23 @@ app = FastAPI(
     version="0.1.0",
     description="基于合成数据演示 BOM → 采购 PO、写前确认、审计与回滚。",
 )
+
+
+@app.exception_handler(ERPAdapterError)
+async def erp_adapter_error_handler(_request: Request, exc: ERPAdapterError) -> JSONResponse:
+    """把不同厂商的失败收敛为对调用方稳定的 HTTP 语义。"""
+
+    if isinstance(exc, ERPUnavailableError):
+        status_code = 503
+    elif isinstance(exc, ERPNotFoundError):
+        status_code = 404
+    elif isinstance(exc, ERPConflictError):
+        status_code = 409
+    elif isinstance(exc, ERPAuthenticationError):
+        status_code = 502
+    else:
+        status_code = 502
+    return JSONResponse(status_code=status_code, content={"detail": str(exc), "type": type(exc).__name__})
 
 
 @app.get("/health")
@@ -68,6 +94,8 @@ def samples() -> list[str]:
 def prepare(request: PrepareRequest) -> PrepareResponse:
     try:
         return agent.prepare(request.task, request.filename, request.content_base64)
+    except ERPAdapterError:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -94,6 +122,8 @@ def chat(request: ChatRequest) -> dict:
     """多轮对话入口：模型通过工具调用循环自主编排采购业务。"""
     try:
         return agent.chat(request.messages, request.session_id)
+    except ERPAdapterError:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -129,4 +159,3 @@ def audit() -> list[dict]:
 @app.get("/error_reports")
 def error_reports() -> list[dict]:
     return repository.error_reports()
-

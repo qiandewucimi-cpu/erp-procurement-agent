@@ -4,13 +4,13 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
+from erp_agent.adapters import build_erp_adapter
 from erp_agent.knowledge import KnowledgeBase
-from erp_agent.repository import ERPRepository
 from erp_agent.tools import ToolRegistry
 
 
 BASE_DIR = Path(__file__).resolve().parent
-repository = ERPRepository(BASE_DIR / "data" / "demo_erp.db")
+repository = build_erp_adapter(BASE_DIR)
 tools = ToolRegistry(repository, KnowledgeBase(BASE_DIR / "knowledge"), BASE_DIR / "samples")
 
 mcp = FastMCP(

@@ -3,11 +3,11 @@ from __future__ import annotations
 import base64
 from pathlib import Path
 
+from .adapters import ERPAdapter
 from .knowledge import KnowledgeBase
 from .llm import AgentLoop, IntentClassifier
 from .models import Citation, PrepareResponse, ToolStep, ValidationIssue
 from .parser import parse_bom
-from .repository import ERPRepository
 from .tools import ToolRegistry
 
 
@@ -21,7 +21,7 @@ class PurchasePOAgent:
 
     def __init__(
         self,
-        repository: ERPRepository,
+        repository: ERPAdapter,
         knowledge: KnowledgeBase,
         samples_dir: Path,
         intent_classifier: IntentClassifier | None = None,
@@ -164,4 +164,3 @@ class PurchasePOAgent:
             citations=[Citation(**item) for item in citations_raw],
             tool_trace=trace,
         )
-

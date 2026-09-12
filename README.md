@@ -36,16 +36,21 @@ flowchart TB
     LOOP --> RB[rollback_po<br/>回滚]
     LOOP --> DM[detect_material_errors<br/>物料错误分级]
     LOOP --> IM[import_material_master<br/>物料档案导入]
-    CP --> DB[(SQLite 模拟 ERP)]
-    CC --> DB
-    RB --> DB
-    DM --> DB
-    IM --> DB
+    QM --> ADAPTER{ERP Adapter}
+    CP --> ADAPTER
+    CC --> ADAPTER
+    RB --> ADAPTER
+    DM --> ADAPTER
+    IM --> ADAPTER
+    ADAPTER --> DB[(SQLite 合成数据)]
+    ADAPTER -.客户测试环境.-> HTTP[客户 ERP HTTP API]
     SK --> KB[(Markdown 规则库)]
     MCP[MCP Server<br/>mcp_server.py] -.->|暴露 7 个标准工具| EXT[任意 MCP 客户端]
 ```
 
 核心设计是「受控工具调用 Agent」：模型通过 Function Calling 自主决定调用哪个工具、传什么参数、调用顺序与次数，因此具备 agent 的多轮、自主编排能力；但**金额计算、业务校验和写入口令始终由确定性代码完成**，模型只做编排不做决定。断网或模型幻觉都不会造成错误写入。
+
+业务层通过 `ERPAdapter` 与具体系统解耦：默认 `SQLite` 实现保证离线演示稳定；`HTTPERPAdapter` 展示客户 API 联调所需的 Bearer 鉴权、超时、有界重试、稳定错误映射和幂等请求头。接口契约和联调边界见 [`docs/ERP_Adapter契约.md`](docs/ERP_Adapter契约.md)。这只是可替换集成层，不声称已连接真实企业 ERP。
 
 ## 三、本地启动
 

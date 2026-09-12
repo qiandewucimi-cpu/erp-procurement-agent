@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from .adapters import ERPAdapter
 from .knowledge import KnowledgeBase
 from .models import ValidationIssue
 from .parser import parse_bom, parse_materials
-from .repository import ERPRepository
 from .validator import MaterialAuditor
 
 
@@ -23,7 +23,7 @@ class ToolRegistry:
 
     def __init__(
         self,
-        repository: ERPRepository,
+        repository: ERPAdapter,
         knowledge: KnowledgeBase,
         samples_dir: Path,
         uploads_dir: Path | None = None,
