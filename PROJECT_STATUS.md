@@ -8,9 +8,9 @@
 
 | 项目 | 当前状态 |
 |---|---|
-| 最后更新时间 | 2026-09-13 00:05（Asia/Shanghai） |
+| 最后更新时间 | 2026-09-13 00:38（Asia/Shanghai） |
 | 当前版本 | v0.6 面试交付强化版（开发中） |
-| 当前阶段 | S0-S2 已完成；当前执行 S3 RBAC 与审批状态机 |
+| 当前阶段 | S0-S3 已完成；当前执行 S4 Agent 安全评测扩充 |
 | 当前开发分支 | `feat/interview-optimization-v1`（本地完整版本先开发验收，完成后再同步公开版） |
 | 主业务场景 | BOM → 采购 PO |
 | 目标受众 | FDE / AI 应用工程方向的作品展示 |
@@ -29,7 +29,7 @@
 | S0 | 计划与分支 | 建立独立开发分支，登记完整路线和接续规则 | 已完成 | `b51fdbe` |
 | S1 | Git 与基线收口 | 处理已有 `start_feishu.cmd` 改动；日志文件不入库；统一 6/7 工具口径；全量测试通过 | 已完成 | `b3f7412`；58/58；eval 8/8 |
 | S2 | ERP Adapter | 抽象 ERP 端口；保留 SQLite Demo Adapter；新增可测试的 HTTP Adapter，覆盖超时、重试、鉴权、错误映射和幂等键 | 已完成 | `a94dd7a`；70/70 |
-| S3 | RBAC 与审批状态机 | viewer/operator/approver 权限；DRAFT→PENDING_APPROVAL→APPROVED→COMMITTED→ROLLED_BACK；发起人与审批人分离 | 待开始 | - |
+| S3 | RBAC 与审批状态机 | viewer/operator/approver 权限；DRAFT→PENDING_APPROVAL→APPROVED→COMMITTED→ROLLED_BACK；发起人与审批人分离 | 已完成 | `6e6ad43`；82/82；MCP 8 工具 |
 | S4 | Agent 安全评测 | 扩充确定性与模型评测，覆盖越权、提示注入、错误参数、重复/并发确认、服务异常，并输出指标报告 | 待开始 | - |
 | S5 | 可观测性 | JSON 结构化日志；request/session/action/tool 关联；工具耗时与错误类型；健康和指标查询 | 待开始 | - |
 | S6 | 面试交付材料 | 更新架构图；补需求范围、ADR、安全清单、验收、部署、排障、试点与回滚材料；完成 5 分钟演示脚本 | 待开始 | - |
@@ -42,7 +42,8 @@
 - 所有实质开发先发生在本仓库；业务材料仅用于提炼抽象规则，禁止复制真实客户、合同、价格、账号或内部文件。
 - S1 已将改造启动前的 `start_feishu.cmd` 用户改动收口：控制台与文件双写、保留退出码、异常自动重启；`feishu_bot.log` 已忽略。
 - S2 已新增 `ERPAdapter` 协议与 `HTTPERPAdapter`；默认继续使用 SQLite 合成数据，通过 `ERP_BACKEND=http` 才切客户测试 API；不声称已连接真实 ERP。
-- 下一步第一动作：为 S3 定义身份、角色、权限和审批状态迁移，先扩展 SQLite schema，再接 API/工具层与测试。
+- S3 已实现可选 RBAC、入口身份绑定、8 工具、审批队列和职责分离；默认关闭以兼容离线 Demo，开启后 API/飞书/MCP 均需绑定身份。
+- 下一步第一动作：扩充 `evals/cases.json` 与评测执行器，优先加入越权、提示注入、状态机、并发确认和 Adapter 失败用例。
 
 ## 2. 项目目标
 
@@ -62,9 +63,9 @@
 ### 3.1 核心后端
 
 - [x] FastAPI 服务与健康检查；
-- [x] 工具调用循环 Agent：模型通过 Function Calling 自主编排 7 个工具（search_knowledge / query_materials / create_purchase_order / confirm_commit / rollback_po / detect_material_errors / import_material_master）；
+- [x] 工具调用循环 Agent：模型通过 Function Calling 自主编排 8 个工具（新增 approve_action；其余为 search/query/create/confirm/rollback/detect/import）；
 - [x] 多轮对话：`/agent/chat` 接口 + session 记忆（模型能记住上一轮的 action_id）；
-- [x] MCP 工具暴露：`mcp_server.py` 用 FastMCP 把 7 个工具暴露为标准 MCP 工具（已做 stdio 真实冒烟）；
+- [x] MCP 工具暴露：`mcp_server.py` 用 FastMCP 把 8 个工具暴露为标准 MCP 工具（已做 stdio 真实冒烟）；
 - [x] 意图识别：可选 LLM（本地 Ollama / 云端千问·智谱），失败自动回退确定性规则；
 - [x] BOM `.xlsx` / `.xlsm` / `.csv` 解析；
 - [x] Markdown 业务规则分块与离线检索；
@@ -81,6 +82,8 @@
 - [x] 基于 `action_id` 的幂等写入；
 - [x] 审计日志；
 - [x] 已提交单据回滚。
+- [x] 可选 RBAC：Token/open_id/MCP 服务身份绑定为 viewer/operator/approver，模型参数不能伪造操作人；
+- [x] 审批状态机与职责分离：DRAFT → PENDING_APPROVAL → APPROVED → COMMITTED → ROLLED_BACK，发起人禁止自审；
 
 ### 3.2 演示与交付
 
@@ -258,6 +261,17 @@
 ```
 
 ## 11. 工作日志
+
+### 2026-09-13 00:38
+
+- 本次目标：完成 S3 RBAC 与审批状态机，把“确认口令”升级为入口身份、角色授权、职责分离和数据库状态迁移共同控制。
+- 实际完成：① 新增 `AccessController`、Actor 和 viewer/operator/approver 权限矩阵；② API Bearer Token、飞书 open_id、MCP 服务 Token 都绑定后端身份，工具 schema 不再允许模型传 operator；③ 新增 `approve_action`（总计 8 工具）与 `/agent/approve`、`/approvals`；④ SQLite 兼容迁移 requested_by/approved_by/approved_at，记录 DRAFT/PENDING_APPROVAL/APPROVED/COMMITTED/ROLLED_BACK；⑤ 发起人自审在 Repository 层再次阻断；⑥ UI 支持侧栏 Token 与审批表；⑦ 完成权限状态机文档、环境示例和 README。
+- 改动文件：`erp_agent/security.py`、`erp_agent/repository.py`、`erp_agent/adapters.py`、`erp_agent/tools.py`、`erp_agent/agent.py`、`erp_agent/llm.py`、`erp_agent/models.py`、`api.py`、`ui.py`、`feishu_bot.py`、`mcp_server.py`、`smoke_mcp.py`、`tests/test_security.py`、`tests/test_adapters.py`、`docs/权限与审批状态机.md`、`docs/ERP_Adapter契约.md`、`.env.example`、`README.md`。
+- 验证命令与结果：单测 82/82；覆盖无凭证 401、越权 403、模型伪造 operator 无效、自审阻断、完整审计事件链、API operator→approver 分离流程、HTTP approve 幂等头；MCP stdio 8 工具冒烟通过；`compileall` 与 `diff --check` 通过。
+- 提交记录：`6e6ad43 feat: enforce RBAC approval workflow`。
+- 遇到的问题：原有接口允许请求体填写 operator，仅适合 Demo；安全模式现以入口绑定身份覆盖该字段，旧字段仅在 RBAC 关闭时保留兼容。
+- 遗留问题：认证为演示级 API-Key 映射，不替代生产 SSO/OAuth/IAM；会话仍在进程内存，生产需外部状态存储。
+- 下一步第一动作：开始 S4，把安全状态与失败模式加入可复现评测并输出指标。
 
 ### 2026-09-13 00:05
 
