@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import base64
+import json
 import logging
+import re
 import time
 from pathlib import Path
 
@@ -40,6 +42,79 @@ class PurchasePOAgent:
         self.tools = ToolRegistry(repository, knowledge, samples_dir, access_controller=self.access)
         self.loop = agent_loop or AgentLoop()
         self.sessions: dict[str, list[dict]] = {}
+        self.offline_actions: dict[str, str] = {}
+
+    @staticmethod
+    def _offline_reply(tool: str, payload: dict) -> str:
+        if payload.get("ok") is False:
+            return str(payload.get("error") or payload.get("message") or "确定性流程执行失败。")
+        if tool == "create_purchase_order":
+            action_id = payload.get("action_id", "")
+            if payload.get("ready"):
+                return (
+                    f"已用确定性流程生成采购 PO 草稿，总金额 ¥{payload.get('total_amount', 0):g}，"
+                    f"action_id={action_id}。当前未启用模型；确认无误后请完整输入「确认提交」。"
+                )
+            blocking = sum(1 for issue in payload.get("issues", []) if issue.get("level") == "blocking")
+            return f"草稿存在 {blocking} 个阻断问题，已禁止提交。action_id={action_id}。"
+        if tool == "confirm_commit":
+            if payload.get("ok"):
+                return f"已写入模拟 ERP，采购单号 {payload.get('po_number', payload.get('po_no', ''))}。"
+            return str(payload.get("error") or "确认提交失败。")
+        if tool == "detect_material_errors":
+            return str(payload.get("summary_text") or payload.get("message") or "物料错误检测已完成。")
+        if tool == "query_materials":
+            return json.dumps(payload, ensure_ascii=False)
+        return "当前未启用模型；请使用生成采购草稿、查询物料或检测 BOM 错误等明确指令。"
+
+    def _filename_in_text(self, text: str) -> str | None:
+        """只从受控目录匹配真实文件名，避免自然语言前缀被当成路径。"""
+        allowed_suffixes = {".xlsx", ".xlsm", ".csv"}
+        filenames: set[str] = set()
+        for base in (self.tools.uploads_dir, self.tools.samples_dir):
+            if base.exists():
+                filenames.update(
+                    path.name for path in base.iterdir() if path.is_file() and path.suffix.lower() in allowed_suffixes
+                )
+        lowered = text.lower()
+        return next((name for name in sorted(filenames, key=len, reverse=True) if name.lower() in lowered), None)
+
+    def _chat_offline(self, messages: list[dict], session_id: str | None, actor: Actor | None) -> tuple[str, list[dict], list[dict]]:
+        """无模型时提供可演示的确定性聊天降级，写入安全边界保持不变。"""
+        history = self.sessions.get(session_id, []) if session_id else []
+        full = history + list(messages)
+        text = next((str(item.get("content", "")) for item in reversed(messages) if item.get("role") == "user"), "").strip()
+        tool = ""
+        arguments: dict = {}
+        if text == "确认提交":
+            action_id = self.offline_actions.get(session_id or "")
+            if not action_id:
+                reply = "当前会话没有可确认的真实草稿，请先生成采购 PO 草稿。"
+                full.append({"role": "assistant", "content": reply})
+                return reply, [], full
+            tool, arguments = "confirm_commit", {"action_id": action_id, "confirmation": text}
+        else:
+            filename = self._filename_in_text(text)
+            material_codes = re.findall(r"MAT-[A-Z0-9-]+", text.upper())
+            if "检测" in text and filename:
+                tool, arguments = "detect_material_errors", {"filename": filename, "push": False}
+            elif ("查" in text or "价格" in text) and material_codes:
+                tool, arguments = "query_materials", {"material_codes": material_codes}
+            elif filename and any(word in text for word in ("采购", "草稿", "生成", "创建")):
+                tool, arguments = "create_purchase_order", {"filename": filename}
+            else:
+                reply = "当前未启用模型；可输入“根据正常示例_BOM.xlsx生成采购 PO 草稿”进行确定性演示。"
+                full.append({"role": "assistant", "content": reply})
+                return reply, [], full
+
+        raw = self.tools.call(tool, arguments) if actor is None else self.tools.call(tool, arguments, actor=actor)
+        payload = json.loads(raw)
+        if tool == "create_purchase_order" and isinstance(payload.get("action_id"), str) and session_id:
+            self.offline_actions[session_id] = payload["action_id"]
+        reply = self._offline_reply(tool, payload)
+        trace = [{"step": 1, "tool": tool, "arguments": arguments, "result": raw}]
+        full.extend([{"role": "tool", "name": tool, "content": raw}, {"role": "assistant", "content": reply}])
+        return reply, trace, full
 
     def chat(self, messages: list[dict], session_id: str | None = None, actor: Actor | None = None) -> dict:
         """多轮对话入口：模型自主调用工具完成采购业务。
@@ -56,7 +131,10 @@ class PurchasePOAgent:
                     full = self.sessions[session_id] + list(messages)
                 else:
                     full = list(messages)
-                reply, trace, full = self.loop.run(full, self.tools, actor=actor)
+                if self.loop.enabled:
+                    reply, trace, full = self.loop.run(full, self.tools, actor=actor)
+                else:
+                    reply, trace, full = self._chat_offline(messages, session_id, actor)
                 if session_id:
                     self.sessions[session_id] = full
                 desc_map = {s["function"]["name"]: s["function"]["description"] for s in self.tools.schemas}
