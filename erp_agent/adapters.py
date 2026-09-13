@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import time
 from pathlib import Path
@@ -11,6 +12,7 @@ from urllib.parse import quote
 import requests
 
 from .repository import ERPRepository
+from .observability import METRICS, log_event
 
 
 def _load_env_file(path: Path) -> None:
@@ -113,6 +115,7 @@ class HTTPERPAdapter:
 
         last_error: Exception | None = None
         for attempt in range(self.max_retries + 1):
+            started = time.perf_counter()
             try:
                 response = self.session.request(
                     method,
@@ -122,12 +125,19 @@ class HTTPERPAdapter:
                     timeout=self.timeout,
                 )
             except (requests.Timeout, requests.ConnectionError) as exc:
+                duration_ms = (time.perf_counter() - started) * 1000
+                METRICS.record("erp_http.request", False, duration_ms)
+                log_event(logging.getLogger("erp_agent.adapter"), "erp_http.request.failed", method=method, attempt=attempt + 1, error_type=type(exc).__name__, duration_ms=round(duration_ms, 3))
                 last_error = exc
                 if attempt < self.max_retries:
                     self.sleeper(self.backoff_seconds * (2**attempt))
                     continue
                 raise ERPUnavailableError(f"ERP 服务不可用：{type(exc).__name__}") from exc
 
+            duration_ms = (time.perf_counter() - started) * 1000
+            success = response.status_code < 400
+            METRICS.record("erp_http.request", success, duration_ms)
+            log_event(logging.getLogger("erp_agent.adapter"), "erp_http.request.completed", method=method, status_code=response.status_code, attempt=attempt + 1, success=success, duration_ms=round(duration_ms, 3))
             if response.status_code in self.RETRYABLE_STATUS and attempt < self.max_retries:
                 self.sleeper(self.backoff_seconds * (2**attempt))
                 continue

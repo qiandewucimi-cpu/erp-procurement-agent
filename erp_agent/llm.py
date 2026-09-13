@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
 import requests
+
+from .observability import METRICS, log_event
 
 
 def _load_dotenv(path: Path | None = None) -> None:
@@ -257,6 +261,7 @@ class AgentLoop:
         return None
 
     def _chat(self, messages: list[dict], tools: list[dict] | None = None) -> dict:
+        started = time.perf_counter()
         url = f"{self.base_url}/chat/completions"
         headers = {"Content-Type": "application/json"}
         if self.api_key:
@@ -265,9 +270,19 @@ class AgentLoop:
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
-        response = requests.post(url, json=payload, headers=headers, timeout=self.timeout)
-        response.raise_for_status()
-        return response.json()["choices"][0]["message"]
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=self.timeout)
+            response.raise_for_status()
+            result = response.json()["choices"][0]["message"]
+            success = True
+            return result
+        except Exception:
+            success = False
+            raise
+        finally:
+            duration_ms = (time.perf_counter() - started) * 1000
+            METRICS.record("llm.request", success, duration_ms)
+            log_event(logging.getLogger("erp_agent.llm"), "llm.request.completed", model=self.model, success=success, duration_ms=round(duration_ms, 3))
 
     def run(self, messages: list[dict], tool_registry, max_steps: int = 8, actor=None) -> tuple[str, list[dict], list[dict]]:
         """执行工具循环，返回 (最终回复文本, 工具调用轨迹, 完整消息历史)。

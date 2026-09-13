@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
+import time
 from pathlib import Path
 
 from .adapters import ERPAdapter
 from .knowledge import KnowledgeBase
 from .models import ValidationIssue
+from .observability import METRICS, bind_context, log_event
 from .parser import parse_bom, parse_materials
 from .security import AccessController, Actor
 from .validator import MaterialAuditor
@@ -216,6 +219,7 @@ class ToolRegistry:
     # 工具实现（返回 JSON 字符串，供模型继续编排）
     # ------------------------------------------------------------------ #
     def call(self, name: str, arguments: dict, actor: Actor | None = None) -> str:
+        started = time.perf_counter()
         handler = {
             "search_knowledge": self._search_knowledge,
             "query_materials": self._query_materials,
@@ -227,15 +231,32 @@ class ToolRegistry:
             "import_material_master": self._import_material_master,
         }.get(name)
         if handler is None:
-            return json.dumps({"ok": False, "error": f"未知工具：{name}"}, ensure_ascii=False)
+            result = json.dumps({"ok": False, "error": f"未知工具：{name}"}, ensure_ascii=False)
+            METRICS.record(f"tool.{name or 'unknown'}", False, (time.perf_counter() - started) * 1000)
+            return result
         try:
-            self.access.authorize(actor, name)
-            bound = dict(arguments)
-            if actor is not None:
-                bound["operator"] = actor.user_id
-            return handler(bound)
+            with bind_context(actor_id=actor.user_id if actor else None, action_id=str(arguments.get("action_id") or "") or None):
+                self.access.authorize(actor, name)
+                bound = dict(arguments)
+                if actor is not None:
+                    bound["operator"] = actor.user_id
+                result = handler(bound)
         except Exception as exc:  # 工具内部异常也转成可读 JSON，不让循环崩溃
-            return json.dumps({"ok": False, "error": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False)
+            result = json.dumps({"ok": False, "error": f"{type(exc).__name__}: {exc}"}, ensure_ascii=False)
+        duration_ms = (time.perf_counter() - started) * 1000
+        try:
+            payload = json.loads(result)
+            success = bool(payload.get("ok"))
+            result_action_id = payload.get("action_id")
+        except (TypeError, json.JSONDecodeError):
+            success, result_action_id = False, None
+        METRICS.record(f"tool.{name}", success, duration_ms)
+        with bind_context(action_id=str(result_action_id) if result_action_id else None):
+            log_event(
+                logging.getLogger("erp_agent.tools"), "tool.call.completed",
+                tool=name, success=success, duration_ms=round(duration_ms, 3),
+            )
+        return result
 
     def _search_knowledge(self, args: dict) -> str:
         query = str(args.get("query", ""))

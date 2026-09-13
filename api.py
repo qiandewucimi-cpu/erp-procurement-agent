@@ -1,5 +1,8 @@
 import json
+import logging
+import time
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -25,10 +28,13 @@ from erp_agent.models import (
     RollbackRequest,
 )
 from erp_agent.repository import ERPRepository
+from erp_agent.observability import METRICS, bind_context, configure_logging, log_event
 from erp_agent.security import AccessController, AuthenticationRequired, PermissionDenied
 
 
 BASE_DIR = Path(__file__).resolve().parent
+configure_logging()
+logger = logging.getLogger("erp_agent.api")
 repository = build_erp_adapter(BASE_DIR)
 access = AccessController.from_env()
 agent = PurchasePOAgent(repository, KnowledgeBase(BASE_DIR / "knowledge"), BASE_DIR / "samples", access_controller=access)
@@ -38,6 +44,33 @@ app = FastAPI(
     version="0.1.0",
     description="基于合成数据演示 BOM → 采购 PO、写前确认、审计与回滚。",
 )
+
+
+@app.middleware("http")
+async def request_observability(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID") or f"REQ-{uuid4().hex[:12].upper()}"
+    started = time.perf_counter()
+    with bind_context(request_id=request_id):
+        log_event(logger, "http.request.started", method=request.method, path=request.url.path)
+        try:
+            response = await call_next(request)
+            success = response.status_code < 500
+        except Exception as exc:
+            duration_ms = (time.perf_counter() - started) * 1000
+            METRICS.record("http.request", False, duration_ms)
+            log_event(
+                logger, "http.request.failed", level=logging.ERROR,
+                method=request.method, path=request.url.path, duration_ms=round(duration_ms, 3), error_type=type(exc).__name__,
+            )
+            raise
+        duration_ms = (time.perf_counter() - started) * 1000
+        METRICS.record("http.request", success, duration_ms)
+        log_event(
+            logger, "http.request.completed", method=request.method, path=request.url.path,
+            status_code=response.status_code, duration_ms=round(duration_ms, 3),
+        )
+        response.headers["X-Request-ID"] = request_id
+        return response
 
 
 @app.exception_handler(ERPAdapterError)
@@ -84,6 +117,12 @@ def health() -> dict:
         "llm_model": agent.loop.model,
         "auth_enabled": access.enabled,
     }
+
+
+@app.get("/metrics")
+def metrics(authorization: str | None = Header(default=None)) -> dict:
+    _authorize(_actor(authorization), "read")
+    return METRICS.snapshot()
 
 
 @app.get("/materials")

@@ -54,6 +54,8 @@ flowchart TB
 
 业务层通过 `ERPAdapter` 与具体系统解耦：默认 `SQLite` 实现保证离线演示稳定；`HTTPERPAdapter` 展示客户 API 联调所需的 Bearer 鉴权、超时、有界重试、稳定错误映射和幂等请求头。接口契约和联调边界见 [`docs/ERP_Adapter契约.md`](docs/ERP_Adapter契约.md)。这只是可替换集成层，不声称已连接真实企业 ERP。
 
+API、Agent、工具、LLM 与 ERP Adapter 共享结构化 JSON 日志和关联上下文；`X-Request-ID` 可贯穿一次 HTTP 调用，`GET /metrics` 展示进程内成功率与延迟指标。实现边界和排障路径见 [`docs/可观测性与排障.md`](docs/可观测性与排障.md)。
+
 可选安全模式把 Token 绑定为 viewer/operator/approver，模型看不到也不能伪造操作人；发起人与审批人强制分离，状态按 DRAFT → PENDING_APPROVAL → APPROVED → COMMITTED → ROLLED_BACK 留下审计。配置和边界见 [`docs/权限与审批状态机.md`](docs/权限与审批状态机.md)。
 
 ## 三、本地启动
@@ -213,6 +215,7 @@ LLM_MODEL=qwen2.5:7b
 | 方法 | 路径 | 作用 |
 |---|---|---|
 | GET | `/health` | 健康检查 + `llm_enabled`/`llm_model`（可判断模型是否真在工作）|
+| GET | `/metrics` | 进程内请求、Agent、工具、LLM、ERP Adapter 成功/失败与延迟指标 |
 | POST | `/agent/chat` | 多轮对话：模型自主编排工具完成采购业务 |
 | POST | `/agent/prepare` | 确定性六步流水线（离线兼容） |
 | POST | `/agent/approve` | approver 审批其他人发起的草稿 |

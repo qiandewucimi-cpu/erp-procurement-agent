@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import base64
+import logging
+import time
 from pathlib import Path
 
 from .adapters import ERPAdapter
 from .knowledge import KnowledgeBase
 from .llm import AgentLoop, IntentClassifier
 from .models import Citation, PrepareResponse, ToolStep, ValidationIssue
+from .observability import METRICS, bind_context, log_event
 from .parser import parse_bom
 from .security import AccessController, Actor
 from .tools import ToolRegistry
@@ -45,22 +48,30 @@ class PurchasePOAgent:
         传入 session_id 时，会接续该会话的完整上下文（模型能记住之前的 action_id）。
         返回 {"reply", "tool_trace", "model", "llm_enabled"}。
         """
-        if session_id and session_id in self.sessions:
-            full = self.sessions[session_id] + list(messages)
-        else:
-            full = list(messages)
-        reply, trace, full = self.loop.run(full, self.tools, actor=actor)
-        if session_id:
-            self.sessions[session_id] = full
-        desc_map = {s["function"]["name"]: s["function"]["description"] for s in self.tools.schemas}
-        for item in trace:
-            item["purpose"] = desc_map.get(item["tool"], "")
-        return {
-            "reply": reply,
-            "tool_trace": trace,
-            "model": self.loop.model,
-            "llm_enabled": self.loop.enabled,
-        }
+        started = time.perf_counter()
+        with bind_context(session_id=session_id, actor_id=actor.user_id if actor else None):
+            log_event(logging.getLogger("erp_agent.agent"), "agent.chat.started", message_count=len(messages))
+            try:
+                if session_id and session_id in self.sessions:
+                    full = self.sessions[session_id] + list(messages)
+                else:
+                    full = list(messages)
+                reply, trace, full = self.loop.run(full, self.tools, actor=actor)
+                if session_id:
+                    self.sessions[session_id] = full
+                desc_map = {s["function"]["name"]: s["function"]["description"] for s in self.tools.schemas}
+                for item in trace:
+                    item["purpose"] = desc_map.get(item["tool"], "")
+                result = {"reply": reply, "tool_trace": trace, "model": self.loop.model, "llm_enabled": self.loop.enabled}
+                success = True
+                return result
+            except Exception:
+                success = False
+                raise
+            finally:
+                duration_ms = (time.perf_counter() - started) * 1000
+                METRICS.record("agent.chat", success, duration_ms)
+                log_event(logging.getLogger("erp_agent.agent"), "agent.chat.completed", success=success, duration_ms=round(duration_ms, 3))
 
     def prepare(self, task: str, filename: str, content_base64: str | None = None, actor: Actor | None = None) -> PrepareResponse:
         self.access.authorize(actor, "prepare")
