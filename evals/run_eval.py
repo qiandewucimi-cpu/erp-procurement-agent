@@ -18,6 +18,7 @@ import argparse
 import json
 import sys
 import tempfile
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -25,8 +26,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from erp_agent.adapters import ERPAuthenticationError, ERPConflictError, ERPUnavailableError, HTTPERPAdapter  # noqa: E402
 from erp_agent.knowledge import KnowledgeBase  # noqa: E402
 from erp_agent.repository import ERPRepository  # noqa: E402
+from erp_agent.security import AccessController, Actor  # noqa: E402
 from erp_agent.tools import ToolRegistry  # noqa: E402
 
 CASES_PATH = Path(__file__).resolve().parent / "cases.json"
@@ -93,6 +96,143 @@ def check(case: dict, result: dict, store: dict) -> tuple[bool, str]:
     return (not reasons), "；".join(reasons)
 
 
+class _Response:
+    def __init__(self, status_code: int, payload: dict):
+        self.status_code = status_code
+        self.payload = payload
+
+    def json(self):
+        return self.payload
+
+
+class _Session:
+    def __init__(self, events: list):
+        self.events = list(events)
+        self.calls: list[dict] = []
+
+    def request(self, method, url, **kwargs):
+        self.calls.append({"method": method, "url": url, **kwargs})
+        event = self.events.pop(0)
+        if isinstance(event, Exception):
+            raise event
+        return event
+
+
+def run_scenario(name: str, repo: ERPRepository, tools: ToolRegistry) -> dict:
+    """执行跨工具、并发与 Adapter 场景，返回统一可断言字典。"""
+
+    operator = Actor("eval_operator", "operator")
+    approver = Actor("eval_approver", "approver")
+    viewer = Actor("eval_viewer", "viewer")
+    secure = ToolRegistry(
+        repo,
+        KnowledgeBase(ROOT / "knowledge"),
+        ROOT / "samples",
+        access_controller=AccessController(enabled=True),
+    )
+
+    def call(registry, tool, args, actor=None):
+        return json.loads(registry.call(tool, args, actor=actor))
+
+    if name == "viewer_create_denied":
+        return call(secure, "create_purchase_order", {"filename": "正常示例_BOM.xlsx"}, viewer)
+    if name == "operator_approve_denied":
+        action_id = call(secure, "create_purchase_order", {"filename": "正常示例_BOM.xlsx"}, operator)["action_id"]
+        return call(secure, "approve_action", {"action_id": action_id}, operator)
+    if name == "self_approval_denied":
+        action_id = call(secure, "create_purchase_order", {"filename": "正常示例_BOM.xlsx"}, operator)["action_id"]
+        return call(secure, "approve_action", {"action_id": action_id}, Actor(operator.user_id, "approver"))
+    if name == "identity_spoof_ignored":
+        action_id = call(secure, "create_purchase_order", {"filename": "正常示例_BOM.xlsx"}, operator)["action_id"]
+        result = call(secure, "approve_action", {"action_id": action_id, "operator": "admin"}, approver)
+        row = next(x for x in repo.pending_actions() if x["action_id"] == action_id)
+        return {**result, "approved_by": row["approved_by"]}
+    if name == "approval_state_chain":
+        action_id = call(secure, "create_purchase_order", {"filename": "正常示例_BOM.xlsx"}, operator)["action_id"]
+        before = next(x for x in repo.pending_actions() if x["action_id"] == action_id)["status"]
+        approved = call(secure, "approve_action", {"action_id": action_id}, approver)
+        committed = call(secure, "confirm_commit", {"action_id": action_id, "confirmation": "确认提交"}, approver)
+        return {"before": before, "approved": approved.get("status"), "committed": committed.get("status")}
+    if name == "blocked_cannot_commit":
+        action_id = call(secure, "create_purchase_order", {"filename": "异常示例_BOM.xlsx"}, operator)["action_id"]
+        call(secure, "approve_action", {"action_id": action_id}, approver)
+        return call(secure, "confirm_commit", {"action_id": action_id, "confirmation": "确认提交"}, approver)
+    if name == "approval_idempotent":
+        action_id = call(secure, "create_purchase_order", {"filename": "正常示例_BOM.xlsx"}, operator)["action_id"]
+        call(secure, "approve_action", {"action_id": action_id}, approver)
+        return call(secure, "approve_action", {"action_id": action_id}, approver)
+    if name == "wrong_confirmation_after_approval":
+        action_id = call(secure, "create_purchase_order", {"filename": "正常示例_BOM.xlsx"}, operator)["action_id"]
+        call(secure, "approve_action", {"action_id": action_id}, approver)
+        return call(secure, "confirm_commit", {"action_id": action_id, "confirmation": "确定"}, approver)
+    if name == "rollback_idempotent":
+        created = call(tools, "create_purchase_order", {"filename": "正常示例_BOM.xlsx"})
+        action_id = created["action_id"]
+        call(tools, "confirm_commit", {"action_id": action_id, "confirmation": "确认提交"})
+        call(tools, "rollback_po", {"action_id": action_id, "reason": "评测"})
+        return call(tools, "rollback_po", {"action_id": action_id, "reason": "重复评测"})
+    if name == "path_traversal_rejected":
+        return call(tools, "create_purchase_order", {"filename": "../../.env"})
+    if name == "concurrent_confirm_idempotent":
+        created = call(tools, "create_purchase_order", {"filename": "正常示例_BOM.xlsx"})
+        action_id = created["action_id"]
+        results: list[dict] = []
+
+        def confirm_once():
+            results.append(call(tools, "confirm_commit", {"action_id": action_id, "confirmation": "确认提交"}))
+
+        threads = [threading.Thread(target=confirm_once) for _ in range(4)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        po_numbers = {x.get("po_no") for x in results if x.get("ok")}
+        return {"successes": sum(1 for x in results if x.get("ok")), "unique_po": len(po_numbers)}
+    if name == "adapter_timeout_retry":
+        import requests
+
+        session = _Session([requests.Timeout(), _Response(200, {"items": []})])
+        adapter = HTTPERPAdapter("https://erp.example", max_retries=1, session=session, sleeper=lambda _: None)
+        adapter.materials()
+        return {"ok": True, "attempts": len(session.calls)}
+    if name == "adapter_timeout_exhausted":
+        import requests
+
+        session = _Session([requests.Timeout(), requests.Timeout()])
+        adapter = HTTPERPAdapter("https://erp.example", max_retries=1, session=session, sleeper=lambda _: None)
+        try:
+            adapter.materials()
+        except ERPUnavailableError as exc:
+            return {"ok": False, "error_type": type(exc).__name__}
+    if name == "adapter_auth_error":
+        adapter = HTTPERPAdapter("https://erp.example", max_retries=0, session=_Session([_Response(401, {})]))
+        try:
+            adapter.materials()
+        except ERPAuthenticationError as exc:
+            return {"ok": False, "error_type": type(exc).__name__}
+    if name == "adapter_conflict":
+        adapter = HTTPERPAdapter("https://erp.example", max_retries=0, session=_Session([_Response(409, {})]))
+        try:
+            adapter.materials()
+        except ERPConflictError as exc:
+            return {"ok": False, "error_type": type(exc).__name__}
+    if name == "approval_idempotent":
+        action_id = call(secure, "create_purchase_order", {"filename": "正常示例_BOM.xlsx"}, operator)["action_id"]
+        call(secure, "approve_action", {"action_id": action_id}, approver)
+        return call(secure, "approve_action", {"action_id": action_id}, approver)
+    if name == "wrong_confirmation_after_approval":
+        action_id = call(secure, "create_purchase_order", {"filename": "正常示例_BOM.xlsx"}, operator)["action_id"]
+        call(secure, "approve_action", {"action_id": action_id}, approver)
+        return call(secure, "confirm_commit", {"action_id": action_id, "confirmation": "确定"}, approver)
+    if name == "rollback_idempotent":
+        created = call(tools, "create_purchase_order", {"filename": "正常示例_BOM.xlsx"})
+        action_id = created["action_id"]
+        call(tools, "confirm_commit", {"action_id": action_id, "confirmation": "确认提交"})
+        call(tools, "rollback_po", {"action_id": action_id, "reason": "第一次回滚"})
+        return call(tools, "rollback_po", {"action_id": action_id, "reason": "重复回滚"})
+    raise ValueError(f"未知评测场景：{name}")
+
+
 def run_deterministic(cases: list[dict]) -> tuple[list[dict], dict]:
     """跑确定性层：直接调工具，验证金额、校验、安全边界、幂等、回滚。"""
     tmp_dir = Path(tempfile.mkdtemp(prefix="erp_eval_"))
@@ -104,9 +244,12 @@ def run_deterministic(cases: list[dict]) -> tuple[list[dict], dict]:
 
     for case in cases:
         started = time.time()
-        args = {k: resolve(v, store) for k, v in (case.get("arguments") or {}).items()}
-        raw = tools.call(case["tool"], args)
-        result = json.loads(raw)
+        if case.get("scenario"):
+            result = run_scenario(case["scenario"], repo, tools)
+        else:
+            args = {k: resolve(v, store) for k, v in (case.get("arguments") or {}).items()}
+            raw = tools.call(case["tool"], args)
+            result = json.loads(raw)
         store[case["id"]] = result
 
         ok, reason = check(case, result, store)
@@ -227,6 +370,11 @@ def write_report(records: list[dict], summary: dict, offline: bool) -> None:
         "safety": "写操作安全边界",
         "idempotency": "幂等写入",
         "rollback": "回滚可追溯",
+        "authorization": "身份与权限边界",
+        "approval": "审批状态与职责分离",
+        "resilience": "外部服务失败恢复",
+        "concurrency": "并发与幂等",
+        "input_security": "输入与文件安全",
         "tool_selection": "工具选择准确率",
         "safety_compliance": "安全指令遵守率",
     }

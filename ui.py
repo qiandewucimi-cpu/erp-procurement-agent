@@ -10,12 +10,16 @@ import streamlit as st
 
 
 API_BASE = os.getenv("ERP_AGENT_API", "http://127.0.0.1:8000")
+API_TOKEN = ""
 # 用户上传目录：与后端 uploads/ 为同一处（容器场景通过 volume 共享）
 UPLOADS_DIR = Path(os.getenv("ERP_AGENT_UPLOADS", "uploads"))
 
 
 def api(method: str, path: str, **kwargs):
-    response = requests.request(method, f"{API_BASE}{path}", timeout=120, **kwargs)
+    headers = dict(kwargs.pop("headers", {}))
+    if API_TOKEN:
+        headers.setdefault("Authorization", f"Bearer {API_TOKEN}")
+    response = requests.request(method, f"{API_BASE}{path}", timeout=120, headers=headers, **kwargs)
     if not response.ok:
         detail = response.json().get("detail", response.text)
         raise RuntimeError(detail)
@@ -23,6 +27,12 @@ def api(method: str, path: str, **kwargs):
 
 
 st.set_page_config(page_title="外贸 ERP 安全操作 Agent", page_icon="🧭", layout="wide")
+API_TOKEN = st.sidebar.text_input(
+    "API 身份令牌（启用 RBAC 时填写）",
+    value=os.getenv("ERP_UI_API_TOKEN", ""),
+    type="password",
+    help="令牌仅保存在当前页面会话；角色由后端配置绑定，模型无法修改。",
+)
 st.title("外贸 ERP 安全操作 Agent")
 st.caption("合成数据 Demo · 工具调用 Agent · 多轮对话 · 写前确认 · 审计与回滚")
 st.info("本项目不连接任何真实企业系统，页面中的客户、供应商、价格和单号均为虚构数据。")
@@ -45,7 +55,7 @@ else:
         "但 Agent 不会自主编排工具。请检查项目根目录 `.env` 里的 `LLM_API_KEY`。"
     )
 
-tab_chat, tab_audit = st.tabs(["Agent 对话", "订单与审计"])
+tab_chat, tab_audit = st.tabs(["Agent 对话", "审批、订单与审计"])
 
 
 def render_trace(trace: list[dict]) -> None:
@@ -182,9 +192,12 @@ with tab_audit:
     if st.button("刷新订单与审计"):
         st.rerun()
     try:
+        approvals = api("GET", "/approvals")
         orders = api("GET", "/orders")
         audits = api("GET", "/audit")
         reports = api("GET", "/error_reports")
+        st.subheader("审批状态")
+        st.dataframe(pd.DataFrame(approvals), use_container_width=True, hide_index=True)
         st.subheader("模拟 ERP 采购 PO")
         st.dataframe(pd.DataFrame(orders), use_container_width=True, hide_index=True)
         st.subheader("审计日志")

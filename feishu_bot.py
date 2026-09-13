@@ -27,9 +27,9 @@ from lark_oapi.api.im.v1 import (
 )
 
 from erp_agent import llm  # noqa: F401  仅为触发 .env 加载（llm.py 里的 _load_dotenv）
+from erp_agent.adapters import build_erp_adapter
 from erp_agent.agent import PurchasePOAgent
 from erp_agent.knowledge import KnowledgeBase
-from erp_agent.repository import ERPRepository
 
 
 # 让 print() 立刻输出：否则重定向到文件/管道时 Python 会块缓冲，
@@ -61,7 +61,7 @@ _EMPTY_REPLY = "（这条消息没能处理，请换个说法再试一次）"
 # 复用现有 Agent（同进程直调，最省事；不需先起 API）
 # --------------------------------------------------------------------------- #
 agent = PurchasePOAgent(
-    ERPRepository(BASE_DIR / "data" / "demo_erp.db"),
+    build_erp_adapter(BASE_DIR),
     KnowledgeBase(BASE_DIR / "knowledge"),
     BASE_DIR / "samples",
 )
@@ -260,7 +260,8 @@ def _send_card(open_id: str, card: dict) -> bool:
 def _reply_with_agent(open_id: str, user_text: str, session_id: str) -> None:
     try:
         with _agent_lock:
-            result = agent.chat([{"role": "user", "content": user_text}], session_id)
+            actor = agent.access.actor_for_user_id(open_id)
+            result = agent.chat([{"role": "user", "content": user_text}], session_id, actor)
     except Exception as exc:  # 任何异常都转成可读回复，别让机器人静默
         _send_text(open_id, f"（处理失败：{type(exc).__name__}: {exc}）")
         return

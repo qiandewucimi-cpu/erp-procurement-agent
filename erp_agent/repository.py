@@ -19,8 +19,9 @@ class ERPRepository:
         self.initialize()
 
     def connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.db_path)
+        connection = sqlite3.connect(self.db_path, timeout=10)
         connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA busy_timeout=10000")
         return connection
 
     @contextmanager
@@ -51,7 +52,10 @@ class ERPRepository:
                     status TEXT NOT NULL,
                     payload_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
-                    committed_at TEXT
+                    committed_at TEXT,
+                    requested_by TEXT,
+                    approved_by TEXT,
+                    approved_at TEXT
                 );
                 CREATE TABLE IF NOT EXISTS purchase_orders (
                     po_no TEXT PRIMARY KEY,
@@ -79,6 +83,10 @@ class ERPRepository:
                 );
                 """
             )
+            columns = {row[1] for row in con.execute("PRAGMA table_info(pending_actions)").fetchall()}
+            for name in ("requested_by", "approved_by", "approved_at"):
+                if name not in columns:
+                    con.execute(f"ALTER TABLE pending_actions ADD COLUMN {name} TEXT")
             con.executemany(
                 """
                 INSERT OR IGNORE INTO materials
@@ -98,20 +106,49 @@ class ERPRepository:
             row = con.execute("SELECT * FROM materials WHERE material_code = ?", (code,)).fetchone()
         return dict(row) if row else None
 
-    def create_pending(self, payload: dict, operator: str = "demo_user") -> str:
+    def create_pending(self, payload: dict, operator: str = "demo_operator") -> str:
         action_id = f"ACT-{uuid4().hex[:10].upper()}"
         with self.session() as con:
             con.execute(
-                "INSERT INTO pending_actions VALUES (?, 'PREVIEWED', ?, ?, NULL)",
-                (action_id, json.dumps(payload, ensure_ascii=False), _now()),
+                """INSERT INTO pending_actions
+                (action_id,status,payload_json,created_at,committed_at,requested_by,approved_by,approved_at)
+                VALUES (?, 'DRAFT', ?, ?, NULL, ?, NULL, NULL)""",
+                (action_id, json.dumps(payload, ensure_ascii=False), _now(), operator),
             )
-            self._audit(con, action_id, "PREVIEW_CREATED", operator, {"ready": payload["ready"]})
+            self._audit(con, action_id, "DRAFT_CREATED", operator, {"ready": payload["ready"]})
+            con.execute("UPDATE pending_actions SET status='PENDING_APPROVAL' WHERE action_id=?", (action_id,))
+            self._audit(con, action_id, "APPROVAL_REQUESTED", operator, {})
         return action_id
+
+    def approve(self, action_id: str, approver: str) -> dict:
+        with self.session() as con:
+            row = con.execute("SELECT * FROM pending_actions WHERE action_id = ?", (action_id,)).fetchone()
+            if not row:
+                raise KeyError("找不到待审批操作")
+            payload = json.loads(row["payload_json"])
+            if not payload.get("ready"):
+                raise ValueError("当前草稿存在阻断问题，禁止审批")
+            if row["requested_by"] == approver:
+                raise ValueError("职责分离校验失败：发起人不能审批自己的操作")
+            if row["status"] == "APPROVED":
+                return {"action_id": action_id, "status": "APPROVED", "idempotent": True}
+            if row["status"] != "PENDING_APPROVAL":
+                raise ValueError(f"当前状态 {row['status']} 不允许审批")
+            approved_at = _now()
+            con.execute(
+                "UPDATE pending_actions SET status='APPROVED', approved_by=?, approved_at=? WHERE action_id=?",
+                (approver, approved_at, action_id),
+            )
+            self._audit(con, action_id, "ACTION_APPROVED", approver, {})
+        return {"action_id": action_id, "status": "APPROVED", "idempotent": False}
 
     def confirm(self, action_id: str, confirmation: str, operator: str) -> dict:
         if confirmation != "确认提交":
             raise ValueError("安全校验失败：请输入“确认提交”")
         with self.session() as con:
+            # 先取得写锁再读取状态，避免并发确认都看到“尚未创建”后争抢唯一键。
+            # 后到请求会等待首个事务提交，再返回同一 PO 的幂等结果。
+            con.execute("BEGIN IMMEDIATE")
             row = con.execute("SELECT * FROM pending_actions WHERE action_id = ?", (action_id,)).fetchone()
             if not row:
                 raise KeyError("找不到待确认操作")
@@ -121,6 +158,17 @@ class ERPRepository:
             existing = con.execute("SELECT * FROM purchase_orders WHERE action_id = ?", (action_id,)).fetchone()
             if existing:
                 return dict(existing) | {"idempotent": True}
+            if row["status"] == "PENDING_APPROVAL":
+                if row["requested_by"] == operator:
+                    raise ValueError("职责分离校验失败：发起人不能审批并提交自己的操作")
+                approved_at = _now()
+                con.execute(
+                    "UPDATE pending_actions SET status='APPROVED', approved_by=?, approved_at=? WHERE action_id=?",
+                    (operator, approved_at, action_id),
+                )
+                self._audit(con, action_id, "ACTION_APPROVED", operator, {"via": "confirm"})
+            elif row["status"] != "APPROVED":
+                raise ValueError(f"当前状态 {row['status']} 不允许提交")
             po_no = f"PO-DEMO-{datetime.now().strftime('%Y%m%d')}-{action_id[-4:]}"
             committed = _now()
             con.execute(
@@ -131,7 +179,7 @@ class ERPRepository:
                 "UPDATE pending_actions SET status='COMMITTED', committed_at=? WHERE action_id=?",
                 (committed, action_id),
             )
-            self._audit(con, action_id, "WRITE_CONFIRMED", operator, {"po_no": po_no})
+            self._audit(con, action_id, "WRITE_COMMITTED", operator, {"po_no": po_no})
         return {"po_no": po_no, "action_id": action_id, "status": "COMMITTED", "idempotent": False}
 
     def rollback(self, action_id: str, reason: str, operator: str) -> dict:
@@ -160,6 +208,14 @@ class ERPRepository:
     def orders(self) -> list[dict]:
         with self.session() as con:
             rows = con.execute("SELECT * FROM purchase_orders ORDER BY created_at DESC").fetchall()
+        return [dict(row) for row in rows]
+
+    def pending_actions(self) -> list[dict]:
+        with self.session() as con:
+            rows = con.execute(
+                """SELECT action_id,status,created_at,committed_at,requested_by,approved_by,approved_at
+                FROM pending_actions ORDER BY created_at DESC"""
+            ).fetchall()
         return [dict(row) for row in rows]
 
     def audits(self) -> list[dict]:

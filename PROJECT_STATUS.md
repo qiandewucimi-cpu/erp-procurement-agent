@@ -8,9 +8,10 @@
 
 | 项目 | 当前状态 |
 |---|---|
-| 最后更新时间 | 2026-09-11 21:20（Asia/Shanghai） |
-| 当前版本 | v0.5 工具调用循环 Agent（Function Calling + 多轮对话 + MCP + 飞书对话入口 + 消息卡片） |
-| 当前阶段 | 核心闭环 + UI 真实点击演示 + 飞书四条链路（文本对话 / BOM→PO / 文件上传 / 错误检测+推送）全部实测通过 + 飞书回复已升级为消息卡片（Markdown 渲染 + 按语义上色）+ App Secret 已轮换；剩余现场业务规则复核 |
+| 最后更新时间 | 2026-09-13 11:36（Asia/Shanghai） |
+| 当前版本 | v0.6 面试交付强化版（开发中） |
+| 当前阶段 | 第一阶段 S0-S8 已完成；等待是否推送 GitHub 的决定 |
+| 当前开发分支 | `feat/interview-optimization-v1`（本地完整版本先开发验收，完成后再同步公开版） |
 | 主业务场景 | BOM → 采购 PO |
 | 目标受众 | FDE / AI 应用工程方向的作品展示 |
 | 数据边界 | 仅使用合成数据；不连接公司生产系统 |
@@ -18,6 +19,36 @@
 | 飞书对话入口 | `start_feishu.cmd`（飞书自建应用 + 长连接，无需公网） |
 | Web 页面 | `http://localhost:8501` |
 | API 文档 | `http://127.0.0.1:8000/docs` |
+
+## 1.1 第一阶段全量改造进度（2026-09-12 启动）
+
+> 接续规则：新会话先读本表，再读本文末尾最新工作日志；只把已经验证并提交的事项标为“已完成”。每完成一步必须填写提交号、验证结果和下一步第一动作。
+
+| 编号 | 阶段 | 目标与验收标准 | 状态 | 提交/证据 |
+|---|---|---|---|---|
+| S0 | 计划与分支 | 建立独立开发分支，登记完整路线和接续规则 | 已完成 | `b51fdbe` |
+| S1 | Git 与基线收口 | 处理已有 `start_feishu.cmd` 改动；日志文件不入库；统一 6/7 工具口径；全量测试通过 | 已完成 | `b3f7412`；58/58；eval 8/8 |
+| S2 | ERP Adapter | 抽象 ERP 端口；保留 SQLite Demo Adapter；新增可测试的 HTTP Adapter，覆盖超时、重试、鉴权、错误映射和幂等键 | 已完成 | `a94dd7a`；70/70 |
+| S3 | RBAC 与审批状态机 | viewer/operator/approver 权限；DRAFT→PENDING_APPROVAL→APPROVED→COMMITTED→ROLLED_BACK；发起人与审批人分离 | 已完成 | `6e6ad43`；82/82；MCP 8 工具 |
+| S4 | Agent 安全评测 | 扩充确定性与模型评测，覆盖越权、提示注入、错误参数、重复/并发确认、服务异常，并输出指标报告 | 已完成 | `38aada9`；25/25 offline；40/40 full |
+| S5 | 可观测性 | JSON 结构化日志；request/session/action/tool 关联；工具耗时与错误类型；健康和指标查询 | 已完成 | `c8cbb41`；88/88 |
+| S6 | 面试交付材料 | 更新架构图；补需求范围、ADR、安全清单、验收、部署、排障、试点与回滚材料；完成 5 分钟演示脚本 | 已完成 | `c6d83a0`；88/88；脱敏扫描通过 |
+| S7 | 简历校准 | 依据最终已验证事实重写项目表述，不提前写未完成能力 | 已完成 | `2bb925e`；实际简历已更新 |
+| S8 | 公开版同步 | 脱敏检查、全量回归，将已验收提交同步至 `erp-procurement-agent`；是否推送 GitHub由用户决定 | 已完成（未 push） | 公开副本本地分支已同步；88/88 |
+
+### 当前接续点
+
+- 已确认目录角色：`rongheng-erp-agent` 是本地完整开发与业务参考版本；`erp-procurement-agent` 是公开发布副本。
+- 所有实质开发先发生在本仓库；业务材料仅用于提炼抽象规则，禁止复制真实客户、合同、价格、账号或内部文件。
+- S1 已将改造启动前的 `start_feishu.cmd` 用户改动收口：控制台与文件双写、保留退出码、异常自动重启；`feishu_bot.log` 已忽略。
+- S2 已新增 `ERPAdapter` 协议与 `HTTPERPAdapter`；默认继续使用 SQLite 合成数据，通过 `ERP_BACKEND=http` 才切客户测试 API；不声称已连接真实 ERP。
+- S3 已实现可选 RBAC、入口身份绑定、8 工具、审批队列和职责分离；默认关闭以兼容离线 Demo，开启后 API/飞书/MCP 均需绑定身份。
+- S4 已形成 40 条评测集与报告；新增确定性 `policy_guard` 只信任工具返回的 action_id，并要求精确确认口令；四路并发确认缺陷已修复。
+- S5 已完成 API→Agent→Tool→LLM/Adapter 结构化日志与关联上下文；`/metrics` 提供进程内成功率、失败数、平均耗时和 P95，敏感字段递归脱敏。
+- S6 已补齐从需求发现到试点回滚的 8 份交付文档、5 分钟演示脚本，并将架构图更新为 8 工具、Adapter、RBAC/审批、可观测性和当前验证数字。
+- S7 已将实际简历中的旧口径（7 工具、58 单测、15/15 评测）更新为当前已验证事实，并在仓库保留不含个人联系方式的项目表述与数字口径说明。
+- S8 已在公开副本创建本地 `feat/interview-optimization-v1` 分支并同步第一阶段提交；公开副本回归 88/88，路径、凭证与受控文件扫描通过；尚未 push GitHub。
+- 下一步第一动作：由用户决定是否将公开副本分支 push 到 GitHub；未明确要求前保持本地。
 
 ## 2. 项目目标
 
@@ -37,14 +68,15 @@
 ### 3.1 核心后端
 
 - [x] FastAPI 服务与健康检查；
-- [x] 工具调用循环 Agent：模型通过 Function Calling 自主编排 6 个工具（search_knowledge / query_materials / create_purchase_order / confirm_commit / rollback_po / detect_material_errors）；
+- [x] 工具调用循环 Agent：模型通过 Function Calling 自主编排 8 个工具（新增 approve_action；其余为 search/query/create/confirm/rollback/detect/import）；
 - [x] 多轮对话：`/agent/chat` 接口 + session 记忆（模型能记住上一轮的 action_id）；
-- [x] MCP 工具暴露：`mcp_server.py` 用 FastMCP 把 6 个工具暴露为标准 MCP 工具（已做 stdio 真实冒烟）；
+- [x] MCP 工具暴露：`mcp_server.py` 用 FastMCP 把 8 个工具暴露为标准 MCP 工具（已做 stdio 真实冒烟）；
 - [x] 意图识别：可选 LLM（本地 Ollama / 云端千问·智谱），失败自动回退确定性规则；
 - [x] BOM `.xlsx` / `.xlsm` / `.csv` 解析；
 - [x] Markdown 业务规则分块与离线检索；
 - [x] 可展示来源、章节、摘要和检索分数；
 - [x] SQLite 模拟 ERP 物料档案；
+- [x] 可替换 ERP Adapter：SQLite Demo 实现 + HTTP 客户 API 实现；HTTP 层含 Bearer 鉴权、超时、有界重试、稳定错误映射和 `Idempotency-Key`；
 - [x] 物料档案导入（`POST /materials/import` + MCP `import_materials` + UI 上传入口，白名单目录解析防路径穿越，模板见 `samples/物料档案模板.xlsx`）；
 - [x] 供应商、单价、包装费和币种查询；
 - [x] 采购 PO 草稿生成及总金额计算；
@@ -55,6 +87,9 @@
 - [x] 基于 `action_id` 的幂等写入；
 - [x] 审计日志；
 - [x] 已提交单据回滚。
+- [x] 可选 RBAC：Token/open_id/MCP 服务身份绑定为 viewer/operator/approver，模型参数不能伪造操作人；
+- [x] 审批状态机与职责分离：DRAFT → PENDING_APPROVAL → APPROVED → COMMITTED → ROLLED_BACK，发起人禁止自审；
+- [x] 结构化 JSON 日志与轻量指标：request/session/action/actor/tool 关联，`GET /metrics` 查询成功率与延迟；
 
 ### 3.2 演示与交付
 
@@ -232,6 +267,104 @@
 ```
 
 ## 11. 工作日志
+
+### 2026-09-13 11:36
+
+- 本次目标：完成 S8 公开版同步门禁，在不触碰远程 GitHub 的前提下，将第一阶段已验收提交安全同步到公开副本。
+- 实际完成：① 本地完整仓库最终回归 88/88，编译与 diff 检查通过；② 扫描跟踪文件，确认未跟踪 `.env`、数据库、日志、上传业务文件或完整个人简历，`uploads/` 仅保留 `.gitkeep`；③ 扫描疑似 API Key/App ID/Bearer Token 模式，无真实凭证命中；④ 清理接续文档中的个人绝对路径，将简历记为“用户本地实际简历（仓库外）”；⑤ 公开副本基于 `a25d064` 创建本地 `feat/interview-optimization-v1`，同步 S0-S7 提交并再次回归 88/88；⑥ 未执行 `git push`。
+- 改动文件：`PROJECT_STATUS.md`、`docs/飞书接入方案.md`；其余为 Git 分支同步和只读验证。
+- 验证命令与结果：两个仓库分别运行单测均 88/88；`compileall`、`git diff --check` 通过；跟踪文件边界和凭证模式扫描通过；公开副本工作树干净。
+- 提交记录：S8 收口记录由本次提交承载；公开副本将在同步该提交后与本地完整版本指向同一提交。
+- 遇到的问题：公开材料扫描发现 S7 日志记录了实际简历绝对路径、飞书方案保留旧发布目录绝对路径；均已改成不含用户名的抽象描述。
+- 遗留问题：公开分支尚未推送 GitHub，这是有意保留的外部发布门禁；远程 CI 尚未运行本分支。
+- 下一步第一动作：若用户批准发布，在公开副本执行 `git push -u origin feat/interview-optimization-v1`，等待 CI 全绿后再决定是否合并 main。
+
+### 2026-09-13 11:31
+
+- 本次目标：完成 S7 简历校准，让求职材料与仓库的已验证能力一致，同时避免生产落地等夸大表述。
+- 实际完成：① 读取用户本地实际简历（仓库外）；② 将 ERP 项目从旧的 7 工具/58 单测/15 条评测口径更新为 8 工具、ERP Adapter、RBAC/职责分离、可信 action_id、并发幂等、88 单测、40/40 最近一次全量评测、87% 最近覆盖率与结构化可观测性；③ 明确“基于实习流程抽象、使用合成数据、不连接生产 ERP”；④ 仓库新增脱敏版 `docs/简历项目表述_v0.6.md`，记录可公开表述和数字适用边界。
+- 改动文件：仓库内 `docs/简历项目表述_v0.6.md`；仓库外为用户本地实际简历（不纳入项目 Git，避免个人联系方式进入代码仓库）。
+- 验证命令与结果：文本检索确认实际简历项目标题与四条描述已替换；旧的“7 工具/单测 58/评测 15/15”项目口径不再出现；数字均能回溯至 S4-S6 验证记录。
+- 提交记录：`2bb925e docs: calibrate resume project claims`（仅提交脱敏项目表述；实际简历按隐私边界留在原路径）。
+- 遇到的问题：实际简历不属于项目 Git 仓库，因此无法依赖项目提交恢复；可公开项目段落已另存仓库，完整简历仍由用户已有材料副本管理。
+- 遗留问题：简历整体版面和一页长度未在本阶段重排；本次只校准已授权的项目事实与求职口径。
+- 下一步第一动作：开始 S8，检查两个仓库状态、提交差异和敏感文件，再在公开副本创建同名独立分支同步。
+
+### 2026-09-13 11:25
+
+- 本次目标：完成 S6 面试交付材料，把代码实现转化为可讲解、可验收、可接续的 FDE 交付链。
+- 实际完成：① 新增需求发现与业务痛点、范围与非目标、ADR、安全风险清单、验收标准与评测报告、部署运行、故障排查、试点上线与回滚 8 份文档；② 新增 5 分钟面试演示脚本，覆盖正常草稿、异常阻断、审批确认、Adapter、可观测性和评测证据；③ README 增加交付材料索引；④ architecture.html 更新为 8 工具口径，补 `/approve`、`/approvals`、`/metrics`、ERPAdapter、RBAC/审批、88 单测与 40 条评测数字；⑤ 所有材料明确“合成数据、未连接真实生产 ERP、Demo 能力不等于生产上线”。
+- 改动文件：`docs/01_需求发现与业务痛点.md` 至 `docs/08_试点上线与回滚方案.md`、`docs/面试演示_5分钟.md`、`README.md`、`architecture.html`。
+- 验证命令与结果：单测 88/88；`compileall` 与 `git diff --check` 通过；对 README、架构图、环境示例与 docs 执行密钥模式扫描，仅命中明确占位符，无真实凭证。
+- 提交记录：`c6d83a0 docs: add interview-ready delivery package`。
+- 遇到的问题：旧架构图仍是 7 工具、58 单测口径且只展示 SQLite，已改为“核心工具示意 + 明确完整 8 工具”，补充 Adapter 与新安全能力，避免为了塞满节点降低可读性。
+- 遗留问题：文档描述的是已实现能力与客户试点方法，尚未经过真实客户生产验收；此边界已在各材料中显式说明。
+- 下一步第一动作：开始 S7，校准简历项目段落，并确保数字、技术名词和边界与仓库证据一致。
+
+### 2026-09-13 11:18
+
+- 本次目标：完成 S5 可观测性，让一次业务请求可从 API 关联到 Agent、工具、LLM 或 ERP Adapter，并提供可复现的运行指标。
+- 实际完成：① 新增 ContextVar 关联上下文，覆盖 request_id/session_id/action_id/actor_id；② FastAPI 接收或生成 `X-Request-ID` 并在响应头返回；③ Agent、8 个工具、LLM 和 HTTP ERP Adapter 记录结构化 JSON 事件、耗时与成功状态；④ 新增线程安全进程内指标，`GET /metrics` 输出 total/success/failure/avg_ms/p95_ms；⑤ 对 token/secret/authorization/api_key/password 字段递归脱敏，调用点不记录消息正文、业务载荷或请求头；⑥ 补充环境示例、README 和排障文档。
+- 改动文件：`erp_agent/observability.py`、`api.py`、`erp_agent/agent.py`、`erp_agent/tools.py`、`erp_agent/llm.py`、`erp_agent/adapters.py`、`tests/test_observability.py`、`docs/可观测性与排障.md`、`.env.example`、`README.md`。
+- 验证命令与结果：`python -m unittest discover -s tests -v` 88/88 通过；新增测试覆盖关联标识、递归脱敏、指标计数/平均值/P95、API 响应头与 `/metrics`；`compileall` 与 `git diff --check` 通过。
+- 提交记录：`c8cbb41 feat: add end-to-end observability`。
+- 遇到的问题：测试日志量随埋点增加，这是结构化日志生效的预期结果；当前指标是单进程 Demo 级，不跨实例持久化。
+- 遗留问题：生产接入仍需集中式日志、Prometheus/OpenTelemetry、告警阈值和数据保留制度，项目文档已明确不将当前实现包装为生产平台。
+- 下一步第一动作：开始 S6，先核对 `architecture.html` 的工具、状态机和验证数字，再补齐八类面试交付文档。
+
+### 2026-09-13 00:50
+
+- 本次目标：完成 S4 Agent 安全评测扩充，让安全、权限、韧性和并发能力都能自动复现，而非只靠文档描述。
+- 实际完成：① 评测集由 15 条扩至 40 条：25 条确定性 + 15 条真实模型；② 新增 authorization/approval/resilience/concurrency/input_security 维度；③ 评测器支持跨工具状态机、四线程并发与 HTTP Adapter 故障场景；④ 新增 `policy_guard`，审批/提交/回滚只接受会话中工具真实返回的 action_id，确认必须是当前消息完整的“确认提交”；⑤ 修复并发确认竞态，SQLite 使用 `BEGIN IMMEDIATE` 与 busy timeout，让后到请求返回同一 PO 的幂等成功结果；⑥ README 与评测报告同步。
+- 改动文件：`evals/cases.json`、`evals/run_eval.py`、`evals/results.json`、`evals/REPORT.md`、`erp_agent/llm.py`、`erp_agent/tools.py`、`erp_agent/repository.py`、`tests/test_agent_loop.py`、`README.md`。
+- 验证命令与结果：离线确定性 25/25；真实模型首轮新增对抗集 12/15，强化系统提示后 14/15，加入确定性 policy guard 后 15/15；最终合并 40/40；单测 85/85；覆盖率 87%；编译通过。
+- 提交记录：`38aada9 test: expand agent safety evaluation to 40 cases`。
+- 遇到的问题：D16 首次暴露四路并发确认仅 1 路返回成功，唯一约束虽防重复但调用体验不幂等；已改为写锁串行后 4 路成功、唯一 PO=1。模型首轮仍尝试危险工具但工具层未写入；policy guard 将阻断点前移到工具执行之前。
+- 遗留问题：真实模型评测会受模型版本与网络波动影响；CI 默认只跑 25 条确定性层，完整 40 条报告需配置模型后手动复跑。
+- 下一步第一动作：开始 S5，加入 request/session/action/tool 关联日志和可查询指标。
+
+### 2026-09-13 00:38
+
+- 本次目标：完成 S3 RBAC 与审批状态机，把“确认口令”升级为入口身份、角色授权、职责分离和数据库状态迁移共同控制。
+- 实际完成：① 新增 `AccessController`、Actor 和 viewer/operator/approver 权限矩阵；② API Bearer Token、飞书 open_id、MCP 服务 Token 都绑定后端身份，工具 schema 不再允许模型传 operator；③ 新增 `approve_action`（总计 8 工具）与 `/agent/approve`、`/approvals`；④ SQLite 兼容迁移 requested_by/approved_by/approved_at，记录 DRAFT/PENDING_APPROVAL/APPROVED/COMMITTED/ROLLED_BACK；⑤ 发起人自审在 Repository 层再次阻断；⑥ UI 支持侧栏 Token 与审批表；⑦ 完成权限状态机文档、环境示例和 README。
+- 改动文件：`erp_agent/security.py`、`erp_agent/repository.py`、`erp_agent/adapters.py`、`erp_agent/tools.py`、`erp_agent/agent.py`、`erp_agent/llm.py`、`erp_agent/models.py`、`api.py`、`ui.py`、`feishu_bot.py`、`mcp_server.py`、`smoke_mcp.py`、`tests/test_security.py`、`tests/test_adapters.py`、`docs/权限与审批状态机.md`、`docs/ERP_Adapter契约.md`、`.env.example`、`README.md`。
+- 验证命令与结果：单测 82/82；覆盖无凭证 401、越权 403、模型伪造 operator 无效、自审阻断、完整审计事件链、API operator→approver 分离流程、HTTP approve 幂等头；MCP stdio 8 工具冒烟通过；`compileall` 与 `diff --check` 通过。
+- 提交记录：`6e6ad43 feat: enforce RBAC approval workflow`。
+- 遇到的问题：原有接口允许请求体填写 operator，仅适合 Demo；安全模式现以入口绑定身份覆盖该字段，旧字段仅在 RBAC 关闭时保留兼容。
+- 遗留问题：认证为演示级 API-Key 映射，不替代生产 SSO/OAuth/IAM；会话仍在进程内存，生产需外部状态存储。
+- 下一步第一动作：开始 S4，把安全状态与失败模式加入可复现评测并输出指标。
+
+### 2026-09-13 00:05
+
+- 本次目标：完成 S2 ERP Adapter，使 Agent 业务层不再绑定 SQLite，并为客户测试环境对接预留可验证接口。
+- 实际完成：① 新增 `ERPAdapter` Protocol，明确工具层依赖的最小 ERP 能力；② 现有 `ERPRepository` 作为结构化兼容的 SQLite Demo 实现；③ 新增 `HTTPERPAdapter`，实现 Bearer 鉴权、超时、指数退避、有界重试、URL 编码、稳定异常类型及写请求幂等键；④ API/MCP/飞书三入口统一从工厂选择后端；⑤ API 将 Adapter 异常映射为 404/409/502/503；⑥ 增加环境变量示例、架构说明与客户联调契约。
+- 改动文件：`erp_agent/adapters.py`、`erp_agent/agent.py`、`erp_agent/tools.py`、`api.py`、`mcp_server.py`、`feishu_bot.py`、`tests/test_adapters.py`、`docs/ERP_Adapter契约.md`、`.env.example`、`README.md`。
+- 验证命令与结果：单测由 58 增至 70，70/70 通过；新增 12 项覆盖默认/HTTP 工厂、`.env` 读取、鉴权头、超时与 5xx 重试、重试耗尽、401/409/其他错误、非 JSON、404 物料、稳定幂等键；`compileall` 与 `git diff --check` 通过。
+- 提交记录：`a94dd7a feat: add replaceable ERP adapter layer`。
+- 遇到的问题：MCP 入口原先不会主动加载 `.env`；工厂现统一安全加载项目配置，已有进程环境变量优先，不回显 Token。
+- 遗留问题：HTTP 契约为可替换集成层和离线模拟验证，尚未获得真实 ERP 授权或字段协议，不得描述成真实生产接入。
+- 下一步第一动作：开始 S3 RBAC 与审批状态机，实现发起人与审批人分离。
+
+### 2026-09-12 23:42
+
+- 本次目标：完成 S1 Git 与项目基线收口。
+- 实际完成：① 审阅并收口改造前遗留的 `start_feishu.cmd`：Python 输出经 `Tee-Object` 同时显示在控制台并追加到日志，保留真实退出码后自动重启；② `feishu_bot.log` 加入忽略规则；③ README 补运行与隐私说明；④ 当前能力口径统一为 7 个工具，历史日志中当时的 5/6 工具事实保持不改。
+- 改动文件：`start_feishu.cmd`、`.gitignore`、`README.md`、`PROJECT_STATUS.md`。
+- 验证命令与结果：日志双写管道自测输出 `TEE_OK` 且保留退出码 7；`git check-ignore` 命中；单测 58/58；离线评测 8/8；`compileall` 通过。
+- 提交记录：`b3f7412 chore: close project baseline gaps`。
+- 遇到的问题：评测脚本会刷新已跟踪的报告时间与耗时；验证后已恢复生成文件，避免把无意义波动混入提交。
+- 遗留问题：S2-S8 尚未实施。
+- 下一步第一动作：开始 S2 ERP Adapter 抽象与 HTTP 集成失败测试。
+
+### 2026-09-12 23:30
+
+- 本次目标：启动面向 FDE / AI 解决方案求职的第一阶段全量改造，并建立可跨会话接续的工程留痕机制。
+- 实际完成：① 明确本地完整版本与 GitHub 公开副本的角色；② 从 `a25d064` 建立 `feat/interview-optimization-v1` 分支；③ 新增 S0-S8 进度表、验收标准、目录边界和当前接续点。
+- 改动文件：`PROJECT_STATUS.md`。
+- 验证命令与结果：分支创建成功；改造前基线为 58/58 单测通过、离线评测 8/8、Python 编译通过。
+- 遇到的问题：本地参考仓库的 `origin/main` 跟踪引用缺失，但不影响本地分支开发；公开副本 `main` 与 `origin/main` 当前一致。
+- 遗留问题：S1-S8 尚未实施；`start_feishu.cmd` 存在改造启动前的未提交改动。
+- 下一步第一动作：完成 S1 Git 与项目基线收口并单独提交。
 
 ### 2026-09-11 21:20
 

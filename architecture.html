@@ -95,8 +95,8 @@
         <rect x="360" y="200" width="400" height="74" rx="8" fill="#ccfbf1" stroke="#14b8a6" stroke-width="2" />
       </g>
       <text x="560" y="226" text-anchor="middle" class="box-title">FastAPI Agent API</text>
-      <text x="560" y="246" text-anchor="middle" class="box-sub">POST /agent/chat · /prepare · /detect · /confirm · /rollback · /materials/import</text>
-      <text x="560" y="264" text-anchor="middle" class="box-sub">GET /materials · /orders · /audit · /error_reports · /health</text>
+      <text x="560" y="246" text-anchor="middle" class="box-sub">POST /agent/chat · /prepare · /detect · /approve · /confirm · /rollback · /materials/import</text>
+      <text x="560" y="264" text-anchor="middle" class="box-sub">GET /materials · /orders · /approvals · /audit · /error_reports · /health · /metrics</text>
 
       <g filter="url(#shadow)">
         <rect x="340" y="312" width="440" height="56" rx="8" fill="#fef3c7" stroke="#f59e0b" stroke-width="2" />
@@ -104,7 +104,7 @@
       <text x="560" y="334" text-anchor="middle" class="box-title">工具调用循环 AgentLoop（Function Calling）</text>
       <text x="560" y="354" text-anchor="middle" class="box-sub">IntentClassifier 意图识别：LLM 可选，失败回退确定性规则</text>
 
-      <text x="105" y="400" class="layer-label">工具层 (7 个业务工具)</text>
+      <text x="105" y="400" class="layer-label">核心工具示意（完整 MCP / Agent 工具集共 8 个，另含 approve_action）</text>
 
       <g filter="url(#shadow)">
         <rect x="105" y="408" width="120" height="78" rx="8" fill="#fce7f3" stroke="#ec4899" stroke-width="2" />
@@ -161,14 +161,14 @@
       <g filter="url(#shadow)">
         <rect x="419" y="512" width="596" height="64" rx="8" fill="#dcfce7" stroke="#10b981" stroke-width="2" />
       </g>
-      <text x="717" y="538" text-anchor="middle" class="box-title">SQLite 模拟 ERP</text>
-      <text x="717" y="558" text-anchor="middle" class="box-sub">物料档案 · 采购 PO · 审计 · 错误报告队列</text>
+      <text x="717" y="538" text-anchor="middle" class="box-title">ERPAdapter：SQLite Demo / HTTP 客户测试 API</text>
+      <text x="717" y="558" text-anchor="middle" class="box-sub">协议翻译 · 鉴权 · 有界重试 · 幂等 · 稳定错误映射</text>
 
       <text x="105" y="612" class="layer-label">外部集成</text>
       <g filter="url(#shadow)">
         <rect x="105" y="620" width="400" height="48" rx="8" fill="#ede9fe" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="6 4" />
       </g>
-      <text x="305" y="646" text-anchor="middle" class="box-sub" font-weight="700">MCP Server（FastMCP）· 复用同一套 7 个工具</text>
+      <text x="305" y="646" text-anchor="middle" class="box-sub" font-weight="700">MCP Server（FastMCP）· 复用同一套 8 个工具</text>
 
       <g filter="url(#shadow)">
         <rect x="620" y="620" width="395" height="48" rx="8" fill="#ede9fe" stroke="#8b5cf6" stroke-width="2" />
@@ -179,7 +179,7 @@
         <rect x="105" y="720" width="910" height="56" rx="10" fill="#f1f5f9" stroke="#475569" stroke-width="2" />
       </g>
       <text x="560" y="744" text-anchor="middle" class="box-title">🛡 安全边界</text>
-      <text x="560" y="764" text-anchor="middle" class="box-sub">金额计算 / 业务校验 / 写入口令 / 错误分级 全部由确定性代码完成 —— 模型只编排、不决策，断网或幻觉都不会错误写入</text>
+      <text x="560" y="764" text-anchor="middle" class="box-sub">RBAC + 职责分离审批 + policy_guard + 幂等审计 —— 模型只编排，金额 / 校验 / 写入由确定性代码控制</text>
 
       <!-- ===== 部署 & 验证（Docker Compose） ===== -->
       <text x="105" y="812" class="layer-label">部署 &amp; 验证（Docker Compose · 已真实构建并跑通）</text>
@@ -209,7 +209,7 @@
         <rect x="105" y="912" width="910" height="48" rx="10" fill="#ecfdf5" stroke="#059669" stroke-width="2" />
       </g>
       <text x="560" y="941" text-anchor="middle" class="box-sub" font-weight="700">
-        ✅ 已验证：容器端到端冒烟 8/8 ｜ MCP stdio 7 工具 ｜ 镜像内无 .env 与明文密钥 ｜ 数据卷持久化 ｜ 单测 58/58 ｜ CI 双 Python 版本
+        ✅ 已验证：安全评测 40/40 ｜ MCP stdio 8 工具 ｜ JSON 日志与指标 ｜ RBAC + 审批状态机 ｜ 单测 88/88 ｜ 覆盖率 87%
       </text>
 
       <g transform="translate(105,978)">
