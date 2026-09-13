@@ -261,8 +261,15 @@ class ToolRegistry:
     def _search_knowledge(self, args: dict) -> str:
         query = str(args.get("query", ""))
         results = self.knowledge.search(query, top_k=3)
+        grounded = bool(results)
         return json.dumps(
-            {"ok": True, "count": len(results), "rules": results},
+            {
+                "ok": True,
+                "grounded": grounded,
+                "count": len(results),
+                "message": "已找到可引用的项目知识" if grounded else "知识库中没有足够相关的依据，请明确告知用户无法依据当前资料回答",
+                "rules": results,
+            },
             ensure_ascii=False,
         )
 

@@ -67,6 +67,19 @@ class TestToolRegistry(unittest.TestCase):
         self.assertEqual(len(result["found"]), 1)
         self.assertEqual(result["missing"], ["NOT-EXIST"])
 
+    def test_knowledge_search_exposes_grounding_evidence(self):
+        hit = json.loads(self.tools.call("search_knowledge", {"query": "采购 PO 行金额怎么计算"}))
+        self.assertTrue(hit["grounded"])
+        self.assertTrue(hit["rules"])
+        self.assertIn("source", hit["rules"][0])
+        self.assertIn("section", hit["rules"][0])
+        self.assertIn("score", hit["rules"][0])
+
+        miss = json.loads(self.tools.call("search_knowledge", {"query": "公司的年假审批制度是什么"}))
+        self.assertFalse(miss["grounded"])
+        self.assertEqual(miss["rules"], [])
+        self.assertIn("没有足够相关", miss["message"])
+
 
 class TestAgentLoop(unittest.TestCase):
     """工具调用循环：模型自主决定调用工具与参数（mock 模型，不依赖网络）。"""
