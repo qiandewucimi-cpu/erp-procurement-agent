@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/qiandewucimi-cpu/erp-procurement-agent/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
-![coverage](https://img.shields.io/badge/coverage-87%25-brightgreen)
+![coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)
 ![eval](https://img.shields.io/badge/eval-40%2F40%20passed-success)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -16,7 +16,7 @@
 |---|---|---|
 | 是否真是 Agent | Function Calling 自主选择 8 个工具、参数与顺序，支持多轮上下文 | `erp_agent/llm.py`、工具轨迹、MCP stdio 冒烟 |
 | 如何避免 LLM 误写 | 金额/校验/权限/状态迁移均为确定性代码；可信 action_id + 精确确认口令 | 25 条离线安全场景 + 15 条模型对抗场景，最近一次 40/40 |
-| 是否具备企业交付思维 | ERPAdapter 隔离客户接口；RBAC、发起/审批分离、幂等、审计、回滚 | 88/88 单测，覆盖率 87%，HTTP Adapter 故障与并发测试 |
+| 是否具备企业交付思维 | ERPAdapter 隔离客户接口；RBAC、发起/审批分离、幂等、审计、回滚 | 93/93 单测，覆盖率 90%，HTTP Adapter 故障与并发测试 |
 | 出错能否定位 | request/session/actor/action/tool 关联 JSON 日志，提供延迟与成功率指标 | `GET /metrics`、递归脱敏测试 |
 | 如何落地客户试点 | 先只读与影子模式，再小范围受控写入；明确停止和回滚条件 | 需求、ADR、安全、验收、部署、排障、试点文档 |
 
@@ -38,6 +38,8 @@ python smoke_interview.py
 6. 换成 `异常示例_BOM.xlsx`，展示未建档物料和非法数量如何阻止写入。
 
 项目进度统一记录在 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)。交付材料按“需求 → 范围 → 决策 → 风险 → 验收 → 运行”组织：[`需求发现`](docs/01_需求发现与业务痛点.md) · [`范围与非目标`](docs/02_需求范围与非目标.md) · [`ADR`](docs/03_架构决策记录_ADR.md) · [`安全风险`](docs/04_安全风险清单.md) · [`验收报告`](docs/05_验收标准与评测报告.md) · [`部署`](docs/06_部署运行手册.md) · [`排障`](docs/07_故障排查手册.md) · [`试点与回滚`](docs/08_试点上线与回滚方案.md)。
+
+面试收口材料：[`项目复盘与高频问答`](docs/09_项目复盘与面试问答.md) · [`系统设计与故障演练`](docs/10_系统设计与故障演练.md) · [`面试前最终检查清单`](docs/11_面试前最终检查清单.md)。面试前可运行 `.venv\Scripts\python.exe interview_preflight.py`，一次完成 7 项离线门禁。
 
 ## 二、架构
 
