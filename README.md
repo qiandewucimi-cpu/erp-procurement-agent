@@ -201,6 +201,14 @@ python evals/run_eval.py             # 全量，真实调用模型
 
 完整报告见 `evals/REPORT.md`，随每次评测自动刷新。
 
+RAG 检索另有一套完全离线的质量门禁，覆盖正向命中与知识范围外拒答：
+
+```powershell
+python evals/run_rag_eval.py
+```
+
+当前合成评测集结果为 Recall@1 80%、Recall@3 100%、MRR 0.883、拒答命中率 100%。明细见 [`evals/RAG_REPORT.md`](evals/RAG_REPORT.md)；这些数字只描述仓库内合成知识库，不代表真实客户语料效果。
+
 ## 四·一、模型配置（工具调用循环）
 
 `/agent/chat` 依赖具备工具调用（Function Calling）能力的模型来编排工具。模型只做编排，金额/校验/写入仍在确定性代码里；不配置模型时 `/agent/chat` 返回不可用提示，`/agent/prepare` 仍可离线运行。

@@ -15,9 +15,15 @@ class Chunk:
 def _tokens(text: str) -> set[str]:
     """中英文混合的轻量检索分词，离线也可稳定运行。"""
     normalized = re.sub(r"\s+", "", text.lower())
-    chinese = "".join(re.findall(r"[\u4e00-\u9fff]", normalized))
+    aliases = {
+        "人工": "人机",
+        "分别负责": "人机协作",
+        "采购单": "采购po",
+    }
+    expanded = normalized + "".join(value for key, value in aliases.items() if key in normalized)
+    chinese = "".join(re.findall(r"[\u4e00-\u9fff]", expanded))
     bigrams = {chinese[i : i + 2] for i in range(max(0, len(chinese) - 1))}
-    words = set(re.findall(r"[a-z0-9_\-]+", normalized))
+    words = set(re.findall(r"[a-z0-9_\-]+", expanded))
     return bigrams | words
 
 
@@ -51,7 +57,7 @@ class KnowledgeBase:
         flush()
         return chunks
 
-    def search(self, query: str, top_k: int = 3) -> list[dict]:
+    def search(self, query: str, top_k: int = 3, min_score: float = 0.15) -> list[dict]:
         q = _tokens(query)
         scored: list[tuple[float, Chunk]] = []
         for chunk in self.chunks:
@@ -61,7 +67,7 @@ class KnowledgeBase:
             for keyword in ("采购", "po", "bom", "包装费", "确认", "审计"):
                 if keyword in query.lower() and keyword in f"{chunk.section}{chunk.text}".lower():
                     score += 0.12
-            if score > 0:
+            if score >= min_score:
                 scored.append((score, chunk))
         scored.sort(key=lambda item: item[0], reverse=True)
         return [
@@ -73,4 +79,3 @@ class KnowledgeBase:
             }
             for score, chunk in scored[:top_k]
         ]
-
