@@ -3,16 +3,30 @@
 ![CI](https://github.com/qiandewucimi-cpu/erp-procurement-agent/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
 ![coverage](https://img.shields.io/badge/coverage-87%25-brightgreen)
-![eval](https://img.shields.io/badge/eval-15%2F15%20passed-success)
+![eval](https://img.shields.io/badge/eval-40%2F40%20passed-success)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-这是一个面向 FDE / AI 应用工程岗位的可运行作品：用完全合成的数据还原“BOM → 采购 PO”流程，展示**工具调用循环 Agent**（Function Calling）、多轮对话、MCP 工具暴露、RAG 检索、ERP Adapter、RBAC、职责分离、审批状态机、幂等、审计和回滚，并配套**可复现的能力评测集**。
+一个面向 FDE / AI 应用工程岗位的可运行交付作品：把容易出错的“BOM → 采购 PO”人工流程，改造成**模型负责编排、确定性代码负责业务决策**的安全 Agent。
 
-项目当前进度、问题、缺口和下一步统一记录在 `PROJECT_STATUS.md`。每次实质改动结束前都应同步更新该文件。
+> 数据边界：只使用合成供应商、合同、物料、价格和单号；不连接、也不声称连接了真实企业生产 ERP。
 
-面试与交付材料按“需求 → 范围 → 决策 → 风险 → 验收 → 运行”组织在 `docs/`：[`需求发现`](docs/01_需求发现与业务痛点.md) · [`范围与非目标`](docs/02_需求范围与非目标.md) · [`ADR`](docs/03_架构决策记录_ADR.md) · [`安全风险`](docs/04_安全风险清单.md) · [`验收报告`](docs/05_验收标准与评测报告.md) · [`部署`](docs/06_部署运行手册.md) · [`排障`](docs/07_故障排查手册.md) · [`试点与回滚`](docs/08_试点上线与回滚方案.md) · [`5 分钟演示`](docs/面试演示_5分钟.md)。
+## 面试官 60 秒速览
 
-> 安全声明：项目不连接任何真实企业生产系统；供应商、合同、物料、价格和单号均为虚构数据。程序只加载项目目录内的合成资料，不会读取其他位置的文件。
+| 要看什么 | 本项目怎么做 | 可核验证据 |
+|---|---|---|
+| 是否真是 Agent | Function Calling 自主选择 8 个工具、参数与顺序，支持多轮上下文 | `erp_agent/llm.py`、工具轨迹、MCP stdio 冒烟 |
+| 如何避免 LLM 误写 | 金额/校验/权限/状态迁移均为确定性代码；可信 action_id + 精确确认口令 | 25 条离线安全场景 + 15 条模型对抗场景，最近一次 40/40 |
+| 是否具备企业交付思维 | ERPAdapter 隔离客户接口；RBAC、发起/审批分离、幂等、审计、回滚 | 88/88 单测，覆盖率 87%，HTTP Adapter 故障与并发测试 |
+| 出错能否定位 | request/session/actor/action/tool 关联 JSON 日志，提供延迟与成功率指标 | `GET /metrics`、递归脱敏测试 |
+| 如何落地客户试点 | 先只读与影子模式，再小范围受控写入；明确停止和回滚条件 | 需求、ADR、安全、验收、部署、排障、试点文档 |
+
+**最快验证路径：**双击 `start_demo.cmd` → 正常 BOM 生成 ¥24164 草稿 → 异常 BOM 被阻断 → 查看审批/审计；完整话术见 [`5 分钟演示脚本`](docs/面试演示_5分钟.md)。
+
+面试前也可运行一条完全离线、不修改项目数据库的证据冒烟：
+
+```powershell
+python smoke_interview.py
+```
 
 ## 一、3 分钟能看到什么
 
@@ -22,6 +36,8 @@
 4. 追问「查一下 MAT-FAB-001 的价格」——模型只查询、不建单，体会 agent 的多轮能力。
 5. 切到“订单与审计”查看操作记录，再演示回滚。
 6. 换成 `异常示例_BOM.xlsx`，展示未建档物料和非法数量如何阻止写入。
+
+项目进度统一记录在 [`PROJECT_STATUS.md`](PROJECT_STATUS.md)。交付材料按“需求 → 范围 → 决策 → 风险 → 验收 → 运行”组织：[`需求发现`](docs/01_需求发现与业务痛点.md) · [`范围与非目标`](docs/02_需求范围与非目标.md) · [`ADR`](docs/03_架构决策记录_ADR.md) · [`安全风险`](docs/04_安全风险清单.md) · [`验收报告`](docs/05_验收标准与评测报告.md) · [`部署`](docs/06_部署运行手册.md) · [`排障`](docs/07_故障排查手册.md) · [`试点与回滚`](docs/08_试点上线与回滚方案.md)。
 
 ## 二、架构
 
