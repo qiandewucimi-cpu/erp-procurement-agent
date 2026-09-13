@@ -8,9 +8,9 @@
 
 | 项目 | 当前状态 |
 |---|---|
-| 最后更新时间 | 2026-09-13 21:35（Asia/Shanghai） |
-| 当前版本 | v0.8 Release 演示验收中（尚未创建 GitHub Release） |
-| 当前阶段 | S20 演示发布门禁：代码回归已通过，待公开版浏览器复验与 CI |
+| 最后更新时间 | 2026-09-13 22:00（Asia/Shanghai） |
+| 当前版本 | v0.8.0（GitHub Release 已发布） |
+| 当前阶段 | S0-S20 全部完成；公开版可离线演示 |
 | 当前开发分支 | `fix/demo-release-readiness` |
 | 主业务场景 | BOM → 采购 PO |
 | 目标受众 | FDE / AI 应用工程方向的作品展示 |
@@ -40,7 +40,7 @@
 
 | 编号 | 阶段 | 目标与验收标准 | 状态 | 提交/证据 |
 |---|---|---|---|---|
-| S20 | 无模型真实演示与 Release | 公开版无 `.env` 启动时，浏览器可完成“生成 ¥24164 草稿 → 精确确认 → 写入模拟 ERP”；全量测试、覆盖率、预检、公开 CI 均通过后才创建 `v0.8.0` Release | 进行中 | 浏览器首轮发现 `MissingSchema`；已补确定性聊天降级与 Streamlit 新版宽度参数；本地 94/94、覆盖率 91%、preflight 7/7；待公开 PR/CI/浏览器复验 |
+| S20 | 无模型真实演示与 Release | 公开版无 `.env` 启动时，浏览器可完成“生成 ¥24164 草稿 → 精确确认 → 写入模拟 ERP”；全量测试、覆盖率、预检、公开 CI 均通过后才创建 `v0.8.0` Release | 已完成并发布 | fix `a59a238`；PR #4 merge `f418e94`；main CI run 34760796785 双版本通过；HTTP 8/8；浏览器提交 `PO-DEMO-20260913-6F80`；Release `v0.8.0` |
 
 ### 当前接续点
 
@@ -273,6 +273,115 @@
 ```
 
 ## 11. 工作日志
+
+### 2026-09-13 22:00
+
+- 本次目标：执行 Release 前的真实演示门禁，只有公开版可演示才发布。
+- 实际完成：① 用公开仓库 `main` 且无 `.env` 启动后，浏览器发现离线聊天错误返回 `MissingSchema`；② 新增无模型确定性聊天降级，保留服务端 action_id、精确“确认提交”和受控目录文件名白名单；③ 将 Streamlit 过期的 `use_container_width` 参数迁移到 `width="stretch"`；④ PR #4 合并至 main；⑤ 从合并提交 `f418e94` 建立独立验收工作树，从零启动标准端口并完成 HTTP 与真实浏览器复验；⑥ 门禁通过后发布 GitHub Release `v0.8.0`。
+- 改动文件：`erp_agent/agent.py`、`tests/test_api.py`、`ui.py`、本文件。
+- 验证结果：本地 94/94；覆盖率 91%；preflight 7/7；PR 与 main 的 Python 3.11/3.12 CI 全绿；HTTP 冒烟 8/8；无模型浏览器生成 ¥24164 草稿并完整输入“确认提交”，成功写入 `PO-DEMO-20260913-6F80`；服务日志无 Streamlit 宽度弃用警告。
+- 发布证据：PR #4 `https://github.com/qiandewucimi-cpu/erp-procurement-agent/pull/4`；Release `https://github.com/qiandewucimi-cpu/erp-procurement-agent/releases/tag/v0.8.0`。
+- 遗留问题：真实模型模式仍依赖用户自行配置模型 API；真实 ERP 接入仍只提供 Adapter 与试点方案，未连接生产系统（有意边界）。
+- 下一步第一动作：面试前运行 `start_demo.cmd`，按 5 分钟演示脚本做一次冷启动彩排；此后仅处理缺陷，不再扩展主范围。
+
+### 2026-09-13 21:20
+
+- 本次目标：完成第四阶段 S17-S19、将第三/四阶段同步公开仓库，并冻结可用于面试的 v0.8 基线。
+- 实际完成：① 新增项目复盘与 12 组高频问答，形成 90 秒介绍和 STAR 叙事；② 新增真实 ERP 演进白板、容量估算、7 类故障与灰度回滚演练；③ 新增 `interview_preflight.py`，一条命令串联 7 项离线门禁并保持评测报告不被离线运行覆盖；④ 修复 `.env.example` 占位符敏感扫描误报；⑤ 校准仓库材料和用户桌面实际简历中的 ERP 项目口径为 93/93、覆盖率 90%、40/40 与 RAG 指标；⑥ 仅挑选公开安全提交同步到公开分支，创建并合并 PR #3；⑦ 等待并确认 PR 与 main 两轮双 Python CI 全绿且零注释。
+- 改动文件：`docs/09_项目复盘与面试问答.md`、`docs/10_系统设计与故障演练.md`、`docs/11_面试前最终检查清单.md`、`interview_preflight.py`、`tests/test_interview_preflight.py`、README/架构/验收/演示/仓库简历表述、用户桌面实际简历、本文件；第三阶段文件见 S13-S16。
+- 验证命令与结果：最终本地完整模型评测 40/40；RAG 14 条门禁通过（Recall@1 80%、Recall@3 100%、MRR 0.883、拒答 100%）；单测 93/93；覆盖率 90%；一键预检 7/7；公开 PR run 34759281945 双 Python 通过且注释 0；main run 34759482184 双 Python 通过（3.11 46 秒、3.12 45 秒）且注释 0。
+- 提交记录：本地 `15d95bd test: add one-command interview preflight`、`3af5351 docs: complete interview closeout playbook`；公开 PR #3，merge `ed308b7242a49b52e16c1949db190e774820bcf0`。
+- 遇到的问题：公开仓库无 `.venv`，改用本地已验收虚拟环境在公开工作目录复测；跨仓库 cherry-pick 的证据快照因时间戳冲突被跳过，最终文件从明确的本地提交精确恢复并在公开副本重跑验证；预检初版会修改报告并误报 `.env.example`，均已修复。
+- 遗留问题：四阶段范围内无未完成任务。真实客户生产接入、SSO/IAM、集中式追踪和向量检索仍是明确的产品化边界，不属于本次四阶段承诺；GitHub Release/tag 未创建，继续作为用户单独授权的可选发布动作。
+- 下一步第一动作：面试前运行 `.venv\Scripts\python.exe interview_preflight.py`；除阻断级缺陷外不再修改冻结基线。若用户另行确认，再创建 GitHub v0.8 Release/tag。
+
+### 2026-09-13 13:15
+
+- 本次目标：完成 S15-S16 本地验收并启动第四阶段面试收口。
+- 实际完成：① 知识工具统一返回 `grounded`、来源、章节、分数和无依据提示；② 系统提示禁止模型在无依据时用常识补写企业规则；③ Streamlit 工具轨迹和飞书文本/卡片均展示知识证据；④ 完整 Agent 评测、RAG 门禁、单测、覆盖率、烟测与脱敏边界复核通过；⑤ 校准 README、架构图、验收文档、演示脚本和仓库简历表述数字；⑥ 建立 S17-S19 路线。
+- 改动文件：S15/S16 详见提交 `4d3fc7c` 与 `821fd99`；本次更新本文件。
+- 验证命令与结果：完整 Agent 评测 40/40；RAG Recall@3 100%、MRR 0.883、拒答 100%；单测 92/92；覆盖率 91%；面试烟测 7/7；飞书证据摘要冒烟、`compileall`、`git diff --check` 通过；敏感扫描仅命中明确占位符。
+- 提交记录：`4d3fc7c feat: surface grounded RAG evidence across channels`；`821fd99 test: verify v0.8 release candidate`。
+- 遇到的问题：飞书卡片最初复用文本摘要时切片会把“工具调用”重复加入 note，提交前已修正切片位置并用构造卡片冒烟验证。
+- 遗留问题：S16 的公开 PR/main CI 尚未执行；第四阶段 S17-S19 尚待实现。GitHub Release 仍保持单独确认门禁。
+- 下一步第一动作：完成 S17 项目复盘和高频问答，确保回答中的每个能力数字都能指向代码、测试或报告。
+
+### 2026-09-13 13:00
+
+- 本次目标：完成 S13 RAG 评测基线，并根据同一基线推进 S14 检索与拒答增强。
+- 实际完成：① 新增 10 条正向检索与 4 条知识范围外问题的合成评测集；② 新增独立 runner，计算 Recall@1、Recall@3、MRR、拒答命中率，生成 JSON/Markdown 证据并以阈值决定退出码；③ 首次基线发现 Recall@3 90%、MRR 0.833、拒答仅 50%；④ 加入显式领域别名和 0.15 最低相关性阈值，避免无关词面重叠形成伪引用；⑤ 将 RAG 评测加入双 Python CI，并在 README 公开指标与合成数据边界；⑥ 新增 3 条回归测试。
+- 改动文件：`erp_agent/knowledge.py`、`evals/rag_cases.json`、`evals/run_rag_eval.py`、`evals/rag_results.json`、`evals/RAG_REPORT.md`、`tests/test_rag_eval.py`、`.github/workflows/ci.yml`、`README.md`。
+- 验证命令与结果：RAG 14 条用例通过门禁，Recall@1 80%、Recall@3 100%、MRR 0.883、拒答命中率 100%；标准库单测 91/91；面试烟测 7/7；`compileall` 与 `git diff --check` 通过。
+- 提交记录：`1a958e5 feat: add gated RAG retrieval evaluation`。
+- 遇到的问题：独立 runner 首次直接执行因项目根目录不在 `sys.path` 报导入失败，已在 runner 中按脚本位置显式加入根目录；首次基线还暴露两个无关问题会返回低分伪引用，已用固定阈值消除。
+- 遗留问题：当前仍是可解释的轻量词面检索，不是 embedding/向量库；14 条是仓库合成知识评测，不能外推为客户真实语料效果。S15 尚未将无依据提示和引用证据完整呈现在各入口与面试脚本中。
+- 下一步第一动作：推进 S15，检查 API、Streamlit 与飞书对“无检索结果”的呈现，补统一拒答文案、来源证据和端到端测试。
+
+### 2026-09-13 12:55
+
+- 本次目标：启动第三阶段，优先补齐当前轻量 RAG 缺少量化评测与拒答证据的问题。
+- 实际完成：① 从本地已验收 v0.7 分支创建 `feat/rag-evaluation-v3`；② 将第三阶段拆为 S13 评测基线、S14 检索与拒答增强、S15 引用证据闭环、S16 v0.8 发布候选；③ 明确先做离线可复现证据，不把轻量检索包装成向量数据库或生产 RAG。
+- 改动文件：本文件。
+- 验证命令与结果：分支创建成功，创建前工作树干净。
+- 提交记录：本条规划提交见其后 Git 历史。
+- 遇到的问题：旧“当前缺口”同时包含已经完成与尚未完成事项，不能直接作为第三阶段路线；本次按当前代码和面试价值重新收口。
+- 遗留问题：S13 尚未实现；GitHub v0.7 Release 仍未获得单独确认，第三阶段不绕过该门禁。
+- 下一步第一动作：建立合成 RAG 评测集与离线 runner，先测出当前检索基线，再决定 S14 的最小必要改动。
+
+### 2026-09-13 12:45
+
+- 本次目标：按用户授权合并 PR #2，复核 main CI，并完成第二阶段 S12 发布收口。
+- 实际完成：① 合并公开仓库 PR #2；② 确认 main merge commit 为 `5ed5d6c5d73437c7958b09316a4d9b69b0bdead0`；③ 等待合并后 CI 完成；④ 将公开副本本地 main 快进同步至远端状态；⑤ 更新本地完整仓库接续文档。
+- 改动文件：公开仓库 main 由 PR #2 合入 `.github/workflows/ci.yml`、`README.md`、`docs/面试演示_5分钟.md`、`smoke_interview.py`；本地完整仓库更新本文件。
+- 验证命令与结果：GitHub Actions run 34738119731 成功；Python 3.11 32 秒、Python 3.12 41 秒，所有单元测试、面试烟测、编译、确定性评测、覆盖率与报告上传步骤通过。
+- 提交记录：公开 main merge `5ed5d6c`；本条进度记录提交见其后 Git 历史。
+- 遇到的问题：当前终端尚未刷新 GitHub CLI 的用户 PATH，直接执行 `gh` 未被识别；改用已安装 CLI 的绝对路径完成操作，没有重复创建或合并其他 PR。
+- 遗留问题：GitHub Release 尚未获得单独确认；本地完整仓库的全量模型评测证据提交 `24c1d07` 未因纯时间戳变化追加到公开 main。
+- 下一步第一动作：等待用户决定是否创建 GitHub v0.7 Release；未获明确授权前不创建。
+
+### 2026-09-13 12:40
+
+- 本次目标：在用户本地轮换模型凭证后完成 S12 全量模型复测，并把可复核证据写入 Git 历史。
+- 实际完成：① 使用最小诊断确认 `glm-4-flash` 请求成功且返回内容，全程未读取或输出密钥；② 完整运行 25 条确定性用例与 15 条真实模型用例；③ 刷新评测报告和原始结果；④ 补跑无网络面试烟测、标准库单测、编译、diff 与凭证模式扫描。
+- 改动文件：`evals/REPORT.md`、`evals/results.json`、本文件。
+- 验证命令与结果：完整评测 40/40（确定性 25/25、模型 15/15）；`smoke_interview.py` 7/7；`python -m unittest discover -s tests -v` 88/88；`compileall`、`git diff --check` 通过；扫描仅命中 README 的 `LLM_API_KEY=你的key` 示例占位符，无真实凭证。
+- 提交记录：`24c1d07 test: refresh v0.7 full model evaluation`；本条进度记录提交见其后 Git 历史。
+- 遇到的问题：首次误用 `pytest` 入口时发现当前虚拟环境未安装 pytest；根据 README 与 CI 的既有约定改用标准库 `unittest`，88 条全部通过，不需要新增依赖。
+- 遗留问题：PR #2 尚未合并；GitHub Release 尚未获得单独确认。本次评测证据仅刷新本地完整仓库，公开 PR 中已有相同 40/40 能力口径，不为时间戳变更追加远端提交。
+- 下一步第一动作：等待用户明确是否合并 PR #2；获准后执行合并并复核 main 分支 Actions。
+
+### 2026-09-13 12:35
+
+- 本次目标：将 S9-S11 以脱敏公开分支交付，并验证升级后的 CI 不再产生 Node.js 20 警告。
+- 实际完成：① 公开副本先通过 `gh auth setup-git` 修复 Windows Git 未复用 CLI 凭证的问题；② 同步已发布 main `09e89a2`；③ 新建公开 `feat/interview-optimization-v2`，只 cherry-pick README、面试冒烟和 CI 三个可发布提交，不包含内部进度日志；④ 推送并创建 PR #2；⑤ 等待远程 CI 完成并查询两项 check annotations。
+- 改动文件：公开分支 `README.md`、`smoke_interview.py`、`docs/面试演示_5分钟.md`、`.github/workflows/ci.yml`；本地本文件记录状态。
+- 验证命令与结果：公开副本面试冒烟 7/7、单测 88/88、敏感凭证模式扫描无命中；GitHub Actions run 34737607725 成功，Python 3.12 39 秒、Python 3.11 44 秒，两个 job annotations 均为 0。
+- 提交记录：公开分支 `51a7925`、`0239f89`、`eb32b0e`；PR #2。
+- 遇到的问题：公开副本本地 main 起初仍是 `a25d064` 且 Git Credential Manager 报 `SEC_E_NO_CREDENTIALS`，第一次 cherry-pick 产生 README 冲突；该未完成操作已安全中止，配置 CLI 凭证后同步到 `09e89a2` 再重做，最终无冲突。
+- 遗留问题：PR #2 尚未合并；当前模型 API 返回 401，无法生成新的 40/40 时间戳；GitHub Release 尚未获单独确认。
+- 下一步第一动作：等待用户决定 PR #2 是否合并，并在本地安全轮换模型凭证后完成 S12 全量模型复测。
+
+### 2026-09-13 12:28
+
+- 本次目标：推进第二阶段 S9-S12，提高 GitHub 首屏转化、面试前自检和 CI 可维护性。
+- 实际完成：① README 新增“面试官 60 秒速览”，把痛点、Agent 差异、安全、交付、排障与试点证据放到首屏，评测徽章由旧 15/15 修正为 40/40；② 新增 `smoke_interview.py`，使用临时数据库离线验证正常金额、越权拒绝、职责分离、幂等、异常阻断与指标，共 7/7；③ 演示脚本加入演示前自检；④ CI 加入面试冒烟，并将 checkout/setup-python/upload-artifact 升级到 Node.js 24 主版本，配置最小 `contents: read` 权限；⑤ 本地单测 88/88、确定性评测 25/25。
+- 改动文件：`README.md`、`smoke_interview.py`、`docs/面试演示_5分钟.md`、`.github/workflows/ci.yml`、本文件。
+- 验证命令与结果：面试冒烟首次因 Windows GBK 无法编码 `¥` 中断，增加 stdout/stderr UTF-8 兼容后 7/7；单测 88/88；离线评测 25/25；完整评测模型层请求统一返回 HTTP 401，经最小诊断确认 `glm-4-flash` 已启用但凭证无效。
+- 提交记录：`8ba624b docs: sharpen recruiter-facing README overview`；`d23ab44 test: add offline interview evidence smoke`；`83dcf23 ci: move official actions to Node 24 runtimes`。
+- 遇到的问题：CI YAML 首次编辑把 pull_request 缩进到 permissions 下，检查文件时发现并在提交前修复；离线/失败的完整评测会自动重写报告，已恢复上次真实 40/40 报告，只保留末尾换行格式变化。
+- 遗留问题：模型 API Key 需在 `.env` 本地轮换后才能生成新的 40/40 时间戳；禁止在对话、日志或 Git 中发送新 Key。S11 尚待 GitHub Actions 验证。
+- 下一步第一动作：从公开 main 建立干净 v2 分支，只同步 S9-S11 三个实现提交，创建 PR 并验证无 Node.js 20 告警。
+
+### 2026-09-13 12:16
+
+- 本次目标：启动第二阶段“面试转化与发布维护”，建立可跨会话接续的范围、顺序和验收标准。
+- 实际完成：① 确认第一阶段 PR #1 已合并，main `09e89a2` 的双 Python CI 通过；② 从该公开基线创建 `feat/interview-optimization-v2`；③ 将第二阶段拆为 S9 GitHub 首屏转化、S10 可复现面试演练、S11 CI 维护、S12 v0.7 发布候选；④ 明确 GitHub Release 仍保留单独确认门禁。
+- 改动文件：`PROJECT_STATUS.md`。
+- 验证命令与结果：新分支工作树干净，基线为已发布 merge commit `09e89a2`。
+- 提交记录：待本次计划提交后填写。
+- 遇到的问题：公开 main 中的接续快照仍停留在“未 push”状态，原因是最终内部发布日志有意未公开；本次从公开基线建立新阶段并用事实纠正状态。
+- 遗留问题：README 评测徽章仍是旧的 15/15，与正文 40/40 不一致；CI 有官方 Actions Node.js 20 弃用警告。
+- 下一步第一动作：先重写 README 首屏信息层级并统一 40/40 评测口径。
 
 ### 2026-09-13 11:36
 
