@@ -72,6 +72,16 @@ def render_trace(trace: list[dict]) -> None:
                 import json
 
                 parsed = json.loads(result)
+                if tool == "search_knowledge":
+                    if parsed.get("grounded"):
+                        st.success("已命中项目知识依据")
+                        for rule in parsed.get("rules", []):
+                            st.caption(
+                                f"来源：{rule.get('source', '?')} · {rule.get('section', '?')} · "
+                                f"相关分数 {rule.get('score', '?')}"
+                            )
+                    else:
+                        st.warning("当前知识库没有足够相关的依据，Agent 不应补写业务规则。")
                 st.json(parsed)
             except Exception:
                 st.text(result)

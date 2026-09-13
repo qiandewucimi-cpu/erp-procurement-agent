@@ -1,0 +1,16 @@
+[
+  {"id":"R1","query":"采购单生成前为什么必须有关联合同和供应商？","expected_source":"采购PO操作规则.md","expected_section":"单据生成前提"},
+  {"id":"R2","query":"采购 PO 的行金额应该怎么计算？","expected_source":"采购PO操作规则.md","expected_section":"字段来源"},
+  {"id":"R3","query":"BOM 名称和物料档案不一致时怎么处理？","expected_source":"采购PO操作规则.md","expected_section":"校验规则"},
+  {"id":"R4","query":"创建采购单之前需要输入什么确认口令？","expected_source":"采购PO操作规则.md","expected_section":"安全写入"},
+  {"id":"R5","query":"重复确认同一个 action_id 会不会重复建单？","expected_source":"采购PO操作规则.md","expected_section":"安全写入"},
+  {"id":"R6","query":"采购单回滚后如何保留审计记录？","expected_source":"采购PO操作规则.md","expected_section":"审计与回滚"},
+  {"id":"R7","query":"物料错误中的阻断和警告有什么区别？","expected_source":"物料错误检测规则.md","expected_section":"错误分级"},
+  {"id":"R8","query":"物料未建档属于什么错误级别？","expected_source":"物料错误检测规则.md","expected_section":"错误类型"},
+  {"id":"R9","query":"错误检测报告在什么情况下才写入推送队列？","expected_source":"物料错误检测规则.md","expected_section":"报告与推送"},
+  {"id":"R10","query":"Agent 和人工在采购流程里分别负责什么？","expected_source":"业务场景说明.md","expected_section":"人机协作边界"},
+  {"id":"N1","query":"公司的年假审批制度是什么？","expect_reject":true},
+  {"id":"N2","query":"客户信用额度如何计算？","expect_reject":true},
+  {"id":"N3","query":"发票税率和报税流程是什么？","expect_reject":true},
+  {"id":"N4","query":"国际物流订舱应该联系谁？","expect_reject":true}
+]

@@ -49,6 +49,9 @@ jobs:
       - name: 评测集（确定性层，无需模型密钥）
         run: python evals/run_eval.py --offline
 
+      - name: RAG 检索质量门禁
+        run: python evals/run_rag_eval.py
+
       - name: 测试覆盖率
         run: |
           python -m coverage run -m unittest discover -s tests

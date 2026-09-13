@@ -173,7 +173,25 @@ def _trace_summary(trace: list) -> str:
         name = item.get("tool", "?")
         if name not in names:
             names.append(name)
-    return f"\n\n—\n工具调用 {len(trace)} 步：{'、'.join(names)}"
+    evidence: list[str] = []
+    for item in trace:
+        if item.get("tool") != "search_knowledge":
+            continue
+        try:
+            payload = json.loads(item.get("result") or "{}")
+        except (TypeError, json.JSONDecodeError):
+            continue
+        if not payload.get("grounded"):
+            evidence.append("知识依据：未命中，未使用模型常识补写")
+        else:
+            refs = [
+                f"{rule.get('source', '?')} / {rule.get('section', '?')} ({rule.get('score', '?')})"
+                for rule in payload.get("rules", [])
+            ]
+            if refs:
+                evidence.append("知识依据：" + "；".join(refs))
+    suffix = "" if not evidence else "\n" + "\n".join(evidence)
+    return f"\n\n—\n工具调用 {len(trace)} 步：{'、'.join(names)}{suffix}"
 
 
 # --------------------------------------------------------------------------- #
@@ -213,6 +231,8 @@ def _build_card(reply_md: str, trace: list, llm_enabled: bool) -> dict:
             if name not in names:
                 names.append(name)
         notes.append(f"工具调用 {len(trace)} 步：{'、'.join(names)}")
+        evidence = _trace_summary(trace).split("\n")[4:]
+        notes.extend(line for line in evidence if line)
     if not llm_enabled:
         notes.append("模型未启用，当前为确定性流水线模式")
     # 仅当这条回复看起来是「待写入的草稿」时才提示口令，避免每条消息都刷屏

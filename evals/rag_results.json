@@ -1,0 +1,328 @@
+{
+  "generated_at": "2026-09-13T13:07:39+08:00",
+  "retriever": "offline lexical bigram overlap",
+  "metrics": {
+    "positive_cases": 10,
+    "negative_cases": 4,
+    "recall_at_1": 0.8,
+    "recall_at_3": 1.0,
+    "mrr": 0.8833,
+    "rejection_accuracy": 1.0
+  },
+  "thresholds": {
+    "recall_at_3": 0.9,
+    "mrr": 0.75,
+    "rejection_accuracy": 1.0
+  },
+  "passed": true,
+  "cases": [
+    {
+      "id": "R1",
+      "query": "采购单生成前为什么必须有关联合同和供应商？",
+      "expected_source": "采购PO操作规则.md",
+      "expected_section": "单据生成前提",
+      "passed": true,
+      "rank": 1,
+      "returned": [
+        {
+          "source": "采购PO操作规则.md",
+          "section": "单据生成前提",
+          "excerpt": "采购 PO 必须关联合同号和供应商。物料编码必须先存在于物料档案；未建档物料不得自动写入。一个采购 PO 只能对应一个供应商和一个币种，如 BOM 中存在多个供应商或币种，应拆分单据。",
+          "score": 0.644
+        },
+        {
+          "source": "采购PO操作规则.md",
+          "section": "字段来源",
+          "excerpt": "物料编码、需求数量和单位来自 BOM。物料名称、供应商、采购单价和币种以模拟 ERP 物料档案为准。包装费来自模拟包装费表。行金额按“数量 ×（采购单价 + 单件包装费）”计算。",
+          "score": 0.406
+        },
+        {
+          "source": "业务场景说明.md",
+          "section": "Agent 目标",
+          "excerpt": "用户上传 BOM 并提出“生成采购 PO”后，Agent 先查操作规则，再解析 BOM，随后调用模拟 ERP 查询物料、供应商、价格和包装费，生成可解释的采购 PO 草稿。每行结果保留数据来源，异常字段明确指出原因。",
+          "score": 0.358
+        }
+      ]
+    },
+    {
+      "id": "R2",
+      "query": "采购 PO 的行金额应该怎么计算？",
+      "expected_source": "采购PO操作规则.md",
+      "expected_section": "字段来源",
+      "passed": true,
+      "rank": 1,
+      "returned": [
+        {
+          "source": "采购PO操作规则.md",
+          "section": "字段来源",
+          "excerpt": "物料编码、需求数量和单位来自 BOM。物料名称、供应商、采购单价和币种以模拟 ERP 物料档案为准。包装费来自模拟包装费表。行金额按“数量 ×（采购单价 + 单件包装费）”计算。",
+          "score": 0.537
+        },
+        {
+          "source": "业务场景说明.md",
+          "section": "Agent 目标",
+          "excerpt": "用户上传 BOM 并提出“生成采购 PO”后，Agent 先查操作规则，再解析 BOM，随后调用模拟 ERP 查询物料、供应商、价格和包装费，生成可解释的采购 PO 草稿。每行结果保留数据来源，异常字段明确指出原因。",
+          "score": 0.407
+        },
+        {
+          "source": "采购PO操作规则.md",
+          "section": "采购 PO 操作规则（合成演示版）",
+          "excerpt": "> 本文仅用于个人作品演示，不来自任何企业生产数据。",
+          "score": 0.407
+        }
+      ]
+    },
+    {
+      "id": "R3",
+      "query": "BOM 名称和物料档案不一致时怎么处理？",
+      "expected_source": "采购PO操作规则.md",
+      "expected_section": "校验规则",
+      "passed": true,
+      "rank": 1,
+      "returned": [
+        {
+          "source": "采购PO操作规则.md",
+          "section": "校验规则",
+          "excerpt": "物料编码、数量、单位、供应商和币种为必填字段。数量必须大于零。BOM 物料名称与物料档案不一致时给出警告并以档案为准；物料不存在、数量非法、多供应商或多币种均为阻断问题。",
+          "score": 0.72
+        },
+        {
+          "source": "物料错误检测规则.md",
+          "section": "错误类型",
+          "excerpt": "| 类型 | 级别 | 触发条件 |\n|---|---|---|\n| 编码为空 | 阻断 | 物料编码缺失 |\n| 数量非法 | 阻断 | 数量缺失、非数字或小于等于 0 |\n| 未建档 | 阻断 | 物料编码在 ERP 物料档案中不存在 |\n| 名称不一致 | 警告 | BOM 名称与档案名称不同，以档案为准 |\n| 单价缺失 | 阻断 | 采购单价缺失或",
+          "score": 0.587
+        },
+        {
+          "source": "采购PO操作规则.md",
+          "section": "字段来源",
+          "excerpt": "物料编码、需求数量和单位来自 BOM。物料名称、供应商、采购单价和币种以模拟 ERP 物料档案为准。包装费来自模拟包装费表。行金额按“数量 ×（采购单价 + 单件包装费）”计算。",
+          "score": 0.453
+        }
+      ]
+    },
+    {
+      "id": "R4",
+      "query": "创建采购单之前需要输入什么确认口令？",
+      "expected_source": "采购PO操作规则.md",
+      "expected_section": "安全写入",
+      "passed": true,
+      "rank": 1,
+      "returned": [
+        {
+          "source": "采购PO操作规则.md",
+          "section": "安全写入",
+          "excerpt": "Agent 只能先生成变更预览，不得静默写入。只有操作者明确输入“确认提交”后才允许创建采购 PO。重复确认同一 action_id 时必须幂等，不得重复建单。",
+          "score": 0.573
+        },
+        {
+          "source": "物料错误检测规则.md",
+          "section": "错误分级",
+          "excerpt": "- **阻断（blocking）**：会导致无法正确生成采购单，必须修正才能继续。\n- **警告（warning）**：不影响生成，但需留意，以档案为准或需人工确认。",
+          "score": 0.462
+        },
+        {
+          "source": "采购PO操作规则.md",
+          "section": "审计与回滚",
+          "excerpt": "系统记录草稿生成、确认写入和回滚事件，包括操作者、时间、action_id 和结果。演示环境中的回滚将采购 PO 标记为 ROLLED_BACK，保留原记录供审计查看。",
+          "score": 0.407
+        }
+      ]
+    },
+    {
+      "id": "R5",
+      "query": "重复确认同一个 action_id 会不会重复建单？",
+      "expected_source": "采购PO操作规则.md",
+      "expected_section": "安全写入",
+      "passed": true,
+      "rank": 1,
+      "returned": [
+        {
+          "source": "采购PO操作规则.md",
+          "section": "安全写入",
+          "excerpt": "Agent 只能先生成变更预览，不得静默写入。只有操作者明确输入“确认提交”后才允许创建采购 PO。重复确认同一 action_id 时必须幂等，不得重复建单。",
+          "score": 0.735
+        },
+        {
+          "source": "采购PO操作规则.md",
+          "section": "审计与回滚",
+          "excerpt": "系统记录草稿生成、确认写入和回滚事件，包括操作者、时间、action_id 和结果。演示环境中的回滚将采购 PO 标记为 ROLLED_BACK，保留原记录供审计查看。",
+          "score": 0.274
+        },
+        {
+          "source": "业务场景说明.md",
+          "section": "人机协作边界",
+          "excerpt": "Agent 负责查找、取数、计算、校验和生成草稿；人负责确认业务意图和最终提交。涉及生产系统时还应增加真实身份认证、角色权限、审批流、密钥管理和监控，本 Demo 不连接任何生产系统。",
+          "score": 0.197
+        }
+      ]
+    },
+    {
+      "id": "R6",
+      "query": "采购单回滚后如何保留审计记录？",
+      "expected_source": "采购PO操作规则.md",
+      "expected_section": "审计与回滚",
+      "passed": true,
+      "rank": 1,
+      "returned": [
+        {
+          "source": "采购PO操作规则.md",
+          "section": "审计与回滚",
+          "excerpt": "系统记录草稿生成、确认写入和回滚事件，包括操作者、时间、action_id 和结果。演示环境中的回滚将采购 PO 标记为 ROLLED_BACK，保留原记录供审计查看。",
+          "score": 0.64
+        },
+        {
+          "source": "业务场景说明.md",
+          "section": "Agent 目标",
+          "excerpt": "用户上传 BOM 并提出“生成采购 PO”后，Agent 先查操作规则，再解析 BOM，随后调用模拟 ERP 查询物料、供应商、价格和包装费，生成可解释的采购 PO 草稿。每行结果保留数据来源，异常字段明确指出原因。",
+          "score": 0.32
+        },
+        {
+          "source": "物料错误检测规则.md",
+          "section": "错误分级",
+          "excerpt": "- **阻断（blocking）**：会导致无法正确生成采购单，必须修正才能继续。\n- **警告（warning）**：不影响生成，但需留意，以档案为准或需人工确认。",
+          "score": 0.32
+        }
+      ]
+    },
+    {
+      "id": "R7",
+      "query": "物料错误中的阻断和警告有什么区别？",
+      "expected_source": "物料错误检测规则.md",
+      "expected_section": "错误分级",
+      "passed": true,
+      "rank": 3,
+      "returned": [
+        {
+          "source": "物料错误检测规则.md",
+          "section": "错误类型",
+          "excerpt": "| 类型 | 级别 | 触发条件 |\n|---|---|---|\n| 编码为空 | 阻断 | 物料编码缺失 |\n| 数量非法 | 阻断 | 数量缺失、非数字或小于等于 0 |\n| 未建档 | 阻断 | 物料编码在 ERP 物料档案中不存在 |\n| 名称不一致 | 警告 | BOM 名称与档案名称不同，以档案为准 |\n| 单价缺失 | 阻断 | 采购单价缺失或",
+          "score": 0.267
+        },
+        {
+          "source": "物料错误检测规则.md",
+          "section": "物料错误检测规则（合成演示版）",
+          "excerpt": "> 本文仅用于个人作品演示，不来自任何企业生产数据。",
+          "score": 0.2
+        },
+        {
+          "source": "物料错误检测规则.md",
+          "section": "错误分级",
+          "excerpt": "- **阻断（blocking）**：会导致无法正确生成采购单，必须修正才能继续。\n- **警告（warning）**：不影响生成，但需留意，以档案为准或需人工确认。",
+          "score": 0.2
+        }
+      ]
+    },
+    {
+      "id": "R8",
+      "query": "物料未建档属于什么错误级别？",
+      "expected_source": "物料错误检测规则.md",
+      "expected_section": "错误类型",
+      "passed": true,
+      "rank": 1,
+      "returned": [
+        {
+          "source": "物料错误检测规则.md",
+          "section": "错误类型",
+          "excerpt": "| 类型 | 级别 | 触发条件 |\n|---|---|---|\n| 编码为空 | 阻断 | 物料编码缺失 |\n| 数量非法 | 阻断 | 数量缺失、非数字或小于等于 0 |\n| 未建档 | 阻断 | 物料编码在 ERP 物料档案中不存在 |\n| 名称不一致 | 警告 | BOM 名称与档案名称不同，以档案为准 |\n| 单价缺失 | 阻断 | 采购单价缺失或",
+          "score": 0.417
+        },
+        {
+          "source": "采购PO操作规则.md",
+          "section": "单据生成前提",
+          "excerpt": "采购 PO 必须关联合同号和供应商。物料编码必须先存在于物料档案；未建档物料不得自动写入。一个采购 PO 只能对应一个供应商和一个币种，如 BOM 中存在多个供应商或币种，应拆分单据。",
+          "score": 0.25
+        },
+        {
+          "source": "物料错误检测规则.md",
+          "section": "物料错误检测规则（合成演示版）",
+          "excerpt": "> 本文仅用于个人作品演示，不来自任何企业生产数据。",
+          "score": 0.167
+        }
+      ]
+    },
+    {
+      "id": "R9",
+      "query": "错误检测报告在什么情况下才写入推送队列？",
+      "expected_source": "物料错误检测规则.md",
+      "expected_section": "报告与推送",
+      "passed": true,
+      "rank": 1,
+      "returned": [
+        {
+          "source": "物料错误检测规则.md",
+          "section": "报告与推送",
+          "excerpt": "检测默认只读、不写库；只有明确要求推送时，才把错误报告写入推送队列（error_reports），并记录审计日志。报告按错误类型聚合计数，同时生成一段可直接发给录单员的文本。",
+          "score": 0.444
+        },
+        {
+          "source": "物料错误检测规则.md",
+          "section": "检测范围",
+          "excerpt": "录单员上传 BOM 后，Agent 对每一行物料逐项校验，发现错误时分级汇总成报告，可推送给录单员处理。",
+          "score": 0.222
+        },
+        {
+          "source": "物料错误检测规则.md",
+          "section": "物料错误检测规则（合成演示版）",
+          "excerpt": "> 本文仅用于个人作品演示，不来自任何企业生产数据。",
+          "score": 0.167
+        }
+      ]
+    },
+    {
+      "id": "R10",
+      "query": "Agent 和人工在采购流程里分别负责什么？",
+      "expected_source": "业务场景说明.md",
+      "expected_section": "人机协作边界",
+      "passed": true,
+      "rank": 2,
+      "returned": [
+        {
+          "source": "物料错误检测规则.md",
+          "section": "错误分级",
+          "excerpt": "- **阻断（blocking）**：会导致无法正确生成采购单，必须修正才能继续。\n- **警告（warning）**：不影响生成，但需留意，以档案为准或需人工确认。",
+          "score": 0.27
+        },
+        {
+          "source": "业务场景说明.md",
+          "section": "人机协作边界",
+          "excerpt": "Agent 负责查找、取数、计算、校验和生成草稿；人负责确认业务意图和最终提交。涉及生产系统时还应增加真实身份认证、角色权限、审批流、密钥管理和监控，本 Demo 不连接任何生产系统。",
+          "score": 0.25
+        },
+        {
+          "source": "业务场景说明.md",
+          "section": "Agent 目标",
+          "excerpt": "用户上传 BOM 并提出“生成采购 PO”后，Agent 先查操作规则，再解析 BOM，随后调用模拟 ERP 查询物料、供应商、价格和包装费，生成可解释的采购 PO 草稿。每行结果保留数据来源，异常字段明确指出原因。",
+          "score": 0.22
+        }
+      ]
+    },
+    {
+      "id": "N1",
+      "query": "公司的年假审批制度是什么？",
+      "expect_reject": true,
+      "passed": true,
+      "returned": []
+    },
+    {
+      "id": "N2",
+      "query": "客户信用额度如何计算？",
+      "expect_reject": true,
+      "passed": true,
+      "returned": []
+    },
+    {
+      "id": "N3",
+      "query": "发票税率和报税流程是什么？",
+      "expect_reject": true,
+      "passed": true,
+      "returned": []
+    },
+    {
+      "id": "N4",
+      "query": "国际物流订舱应该联系谁？",
+      "expect_reject": true,
+      "passed": true,
+      "returned": []
+    }
+  ]
+}
