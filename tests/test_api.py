@@ -5,7 +5,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 import api as api_module
-from erp_agent.llm import IntentClassifier
+from erp_agent.llm import AgentLoop, IntentClassifier
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,6 +22,7 @@ class ApiTest(unittest.TestCase):
             api_module.KnowledgeBase(ROOT / "knowledge"),
             ROOT / "samples",
             intent_classifier=IntentClassifier(base_url=""),
+            agent_loop=AgentLoop(base_url=""),
         )
         api_module.repository = cls.repository
         api_module.agent = cls.agent
@@ -83,6 +84,28 @@ class ApiTest(unittest.TestCase):
             json={"task": "根据 BOM 生成采购 PO", "filename": "不存在.xlsx"},
         )
         self.assertEqual(response.status_code, 400)
+
+    def test_chat_without_model_uses_safe_deterministic_fallback(self):
+        session_id = uuid4().hex
+        prepared = self.client.post(
+            "/agent/chat",
+            json={
+                "session_id": session_id,
+                "messages": [{"role": "user", "content": "根据正常示例_BOM.xlsx生成采购 PO 草稿，先给我看金额"}],
+            },
+        )
+        self.assertEqual(prepared.status_code, 200)
+        body = prepared.json()
+        self.assertFalse(body["llm_enabled"])
+        self.assertIn("¥24164", body["reply"])
+        self.assertEqual(body["tool_trace"][0]["tool"], "create_purchase_order")
+
+        confirmed = self.client.post(
+            "/agent/chat",
+            json={"session_id": session_id, "messages": [{"role": "user", "content": "确认提交"}]},
+        )
+        self.assertEqual(confirmed.status_code, 200)
+        self.assertIn("已写入模拟 ERP", confirmed.json()["reply"])
 
 
 if __name__ == "__main__":

@@ -114,7 +114,7 @@ with tab_chat:
                     st.success(res.get("summary_text", "导入完成"))
                     if res.get("skipped"):
                         st.warning(f"有 {len(res['skipped'])} 行被跳过：")
-                        st.dataframe(pd.DataFrame(res["skipped"]), use_container_width=True, hide_index=True)
+                        st.dataframe(pd.DataFrame(res["skipped"]), width="stretch", hide_index=True)
                     st.rerun()
                 except Exception as exc:
                     st.error(f"导入失败：{exc}")
@@ -138,7 +138,7 @@ with tab_chat:
                     pd.DataFrame(mats)[
                         ["material_code", "material_name", "supplier_name", "unit_price", "packaging_fee", "currency"]
                     ],
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                 )
         except Exception:
@@ -207,12 +207,12 @@ with tab_audit:
         audits = api("GET", "/audit")
         reports = api("GET", "/error_reports")
         st.subheader("审批状态")
-        st.dataframe(pd.DataFrame(approvals), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(approvals), width="stretch", hide_index=True)
         st.subheader("模拟 ERP 采购 PO")
-        st.dataframe(pd.DataFrame(orders), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(orders), width="stretch", hide_index=True)
         st.subheader("审计日志")
-        st.dataframe(pd.DataFrame(audits), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(audits), width="stretch", hide_index=True)
         st.subheader("物料错误报告（推送队列）")
-        st.dataframe(pd.DataFrame(reports), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(reports), width="stretch", hide_index=True)
     except Exception as exc:
         st.warning(f"后端尚未启动：{exc}")
