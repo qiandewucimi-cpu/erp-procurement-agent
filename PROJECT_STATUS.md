@@ -8,9 +8,9 @@
 
 | 项目 | 当前状态 |
 |---|---|
-| 最后更新时间 | 2026-09-13 00:50（Asia/Shanghai） |
+| 最后更新时间 | 2026-09-13 11:18（Asia/Shanghai） |
 | 当前版本 | v0.6 面试交付强化版（开发中） |
-| 当前阶段 | S0-S4 已完成；当前执行 S5 可观测性 |
+| 当前阶段 | S0-S5 已完成；当前执行 S6 面试交付材料 |
 | 当前开发分支 | `feat/interview-optimization-v1`（本地完整版本先开发验收，完成后再同步公开版） |
 | 主业务场景 | BOM → 采购 PO |
 | 目标受众 | FDE / AI 应用工程方向的作品展示 |
@@ -31,7 +31,7 @@
 | S2 | ERP Adapter | 抽象 ERP 端口；保留 SQLite Demo Adapter；新增可测试的 HTTP Adapter，覆盖超时、重试、鉴权、错误映射和幂等键 | 已完成 | `a94dd7a`；70/70 |
 | S3 | RBAC 与审批状态机 | viewer/operator/approver 权限；DRAFT→PENDING_APPROVAL→APPROVED→COMMITTED→ROLLED_BACK；发起人与审批人分离 | 已完成 | `6e6ad43`；82/82；MCP 8 工具 |
 | S4 | Agent 安全评测 | 扩充确定性与模型评测，覆盖越权、提示注入、错误参数、重复/并发确认、服务异常，并输出指标报告 | 已完成 | `38aada9`；25/25 offline；40/40 full |
-| S5 | 可观测性 | JSON 结构化日志；request/session/action/tool 关联；工具耗时与错误类型；健康和指标查询 | 待开始 | - |
+| S5 | 可观测性 | JSON 结构化日志；request/session/action/tool 关联；工具耗时与错误类型；健康和指标查询 | 已完成 | `c8cbb41`；88/88 |
 | S6 | 面试交付材料 | 更新架构图；补需求范围、ADR、安全清单、验收、部署、排障、试点与回滚材料；完成 5 分钟演示脚本 | 待开始 | - |
 | S7 | 简历校准 | 依据最终已验证事实重写项目表述，不提前写未完成能力 | 待开始 | - |
 | S8 | 公开版同步 | 脱敏检查、全量回归，将已验收提交同步至 `erp-procurement-agent`；是否推送 GitHub由用户决定 | 待开始 | - |
@@ -44,7 +44,8 @@
 - S2 已新增 `ERPAdapter` 协议与 `HTTPERPAdapter`；默认继续使用 SQLite 合成数据，通过 `ERP_BACKEND=http` 才切客户测试 API；不声称已连接真实 ERP。
 - S3 已实现可选 RBAC、入口身份绑定、8 工具、审批队列和职责分离；默认关闭以兼容离线 Demo，开启后 API/飞书/MCP 均需绑定身份。
 - S4 已形成 40 条评测集与报告；新增确定性 `policy_guard` 只信任工具返回的 action_id，并要求精确确认口令；四路并发确认缺陷已修复。
-- 下一步第一动作：实现 S5 结构化日志上下文与内存指标，贯穿 API→Agent→Tool→Adapter，并提供 `/metrics` 查询。
+- S5 已完成 API→Agent→Tool→LLM/Adapter 结构化日志与关联上下文；`/metrics` 提供进程内成功率、失败数、平均耗时和 P95，敏感字段递归脱敏。
+- 下一步第一动作：执行 S6，更新架构图并形成需求、ADR、安全、验收、部署、排障、试点回滚与 5 分钟演示材料。
 
 ## 2. 项目目标
 
@@ -85,6 +86,7 @@
 - [x] 已提交单据回滚。
 - [x] 可选 RBAC：Token/open_id/MCP 服务身份绑定为 viewer/operator/approver，模型参数不能伪造操作人；
 - [x] 审批状态机与职责分离：DRAFT → PENDING_APPROVAL → APPROVED → COMMITTED → ROLLED_BACK，发起人禁止自审；
+- [x] 结构化 JSON 日志与轻量指标：request/session/action/actor/tool 关联，`GET /metrics` 查询成功率与延迟；
 
 ### 3.2 演示与交付
 
@@ -262,6 +264,17 @@
 ```
 
 ## 11. 工作日志
+
+### 2026-09-13 11:18
+
+- 本次目标：完成 S5 可观测性，让一次业务请求可从 API 关联到 Agent、工具、LLM 或 ERP Adapter，并提供可复现的运行指标。
+- 实际完成：① 新增 ContextVar 关联上下文，覆盖 request_id/session_id/action_id/actor_id；② FastAPI 接收或生成 `X-Request-ID` 并在响应头返回；③ Agent、8 个工具、LLM 和 HTTP ERP Adapter 记录结构化 JSON 事件、耗时与成功状态；④ 新增线程安全进程内指标，`GET /metrics` 输出 total/success/failure/avg_ms/p95_ms；⑤ 对 token/secret/authorization/api_key/password 字段递归脱敏，调用点不记录消息正文、业务载荷或请求头；⑥ 补充环境示例、README 和排障文档。
+- 改动文件：`erp_agent/observability.py`、`api.py`、`erp_agent/agent.py`、`erp_agent/tools.py`、`erp_agent/llm.py`、`erp_agent/adapters.py`、`tests/test_observability.py`、`docs/可观测性与排障.md`、`.env.example`、`README.md`。
+- 验证命令与结果：`python -m unittest discover -s tests -v` 88/88 通过；新增测试覆盖关联标识、递归脱敏、指标计数/平均值/P95、API 响应头与 `/metrics`；`compileall` 与 `git diff --check` 通过。
+- 提交记录：`c8cbb41 feat: add end-to-end observability`。
+- 遇到的问题：测试日志量随埋点增加，这是结构化日志生效的预期结果；当前指标是单进程 Demo 级，不跨实例持久化。
+- 遗留问题：生产接入仍需集中式日志、Prometheus/OpenTelemetry、告警阈值和数据保留制度，项目文档已明确不将当前实现包装为生产平台。
+- 下一步第一动作：开始 S6，先核对 `architecture.html` 的工具、状态机和验证数字，再补齐八类面试交付文档。
 
 ### 2026-09-13 00:50
 
