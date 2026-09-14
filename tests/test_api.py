@@ -1,5 +1,6 @@
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -100,12 +101,59 @@ class ApiTest(unittest.TestCase):
         self.assertIn("¥24164", body["reply"])
         self.assertEqual(body["tool_trace"][0]["tool"], "create_purchase_order")
 
+        detail = self.client.post(
+            "/agent/chat",
+            json={"session_id": session_id, "messages": [{"role": "user", "content": "查看具体金额"}]},
+        )
+        self.assertEqual(detail.status_code, 200)
+        detail_reply = detail.json()["reply"]
+        self.assertIn("采购 PO 金额明细", detail_reply)
+        self.assertIn("MAT-FAB-001", detail_reply)
+        self.assertIn("单价 ¥18.6", detail_reply)
+        self.assertIn("包装费 ¥0.35", detail_reply)
+        self.assertIn("¥22740", detail_reply)
+        self.assertIn("合计：¥24164", detail_reply)
+
         confirmed = self.client.post(
             "/agent/chat",
             json={"session_id": session_id, "messages": [{"role": "user", "content": "确认提交"}]},
         )
         self.assertEqual(confirmed.status_code, 200)
         self.assertIn("已写入模拟 ERP", confirmed.json()["reply"])
+
+    def test_exact_confirmation_bypasses_online_model_choice(self):
+        session_id = uuid4().hex
+        raw = self.agent.tools.call("create_purchase_order", {"filename": "正常示例_BOM.xlsx"})
+        self.agent.sessions[session_id] = [{"role": "tool", "content": raw}]
+        original_loop = self.agent.loop
+        self.agent.loop = AgentLoop(base_url="http://model.invalid/v1")
+        try:
+            with patch.object(self.agent.loop, "run") as model_run:
+                result = self.agent.chat(
+                    [{"role": "user", "content": "确认提交"}], session_id=session_id
+                )
+        finally:
+            self.agent.loop = original_loop
+        model_run.assert_not_called()
+        self.assertIn("已写入模拟 ERP", result["reply"])
+        self.assertEqual(result["tool_trace"][0]["tool"], "confirm_commit")
+
+    def test_amount_detail_bypasses_online_model_and_uses_tool_draft(self):
+        session_id = uuid4().hex
+        raw = self.agent.tools.call("create_purchase_order", {"filename": "正常示例_BOM.xlsx"})
+        self.agent.sessions[session_id] = [{"role": "tool", "content": raw}]
+        original_loop = self.agent.loop
+        self.agent.loop = AgentLoop(base_url="http://model.invalid/v1")
+        try:
+            with patch.object(self.agent.loop, "run") as model_run:
+                result = self.agent.chat(
+                    [{"role": "user", "content": "查看具体金额"}], session_id=session_id
+                )
+        finally:
+            self.agent.loop = original_loop
+        model_run.assert_not_called()
+        self.assertIn("MAT-ZIP-002", result["reply"])
+        self.assertIn("合计：¥24164", result["reply"])
 
 
 if __name__ == "__main__":
