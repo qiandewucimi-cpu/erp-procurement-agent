@@ -8,10 +8,10 @@
 
 | 项目 | 当前状态 |
 |---|---|
-| 最后更新时间 | 2026-09-14 10:32（Asia/Shanghai） |
-| 当前版本 | v0.8.0（GitHub Release 已发布） |
-| 当前阶段 | S0-S20 与 S22 已完成；飞书三轮对话已真实提交，正在发布 v0.8.1 补丁 |
-| 当前开发分支 | `fix/feishu-deterministic-v081` |
+| 最后更新时间 | 2026-09-14 10:48（Asia/Shanghai） |
+| 当前版本 | v0.8.1（GitHub Release 已发布） |
+| 当前阶段 | S0-S20 与 S22 已完成并发布；项目进入面试冻结期 |
+| 当前开发分支 | `main`（发布记录分支：`docs/record-v081-release`） |
 | 主业务场景 | BOM → 采购 PO |
 | 目标受众 | FDE / AI 应用工程方向的作品展示 |
 | 数据边界 | 仅使用合成数据；不连接公司生产系统 |
@@ -41,7 +41,7 @@
 | 编号 | 阶段 | 目标与验收标准 | 状态 | 提交/证据 |
 |---|---|---|---|---|
 | S20 | 无模型真实演示与 Release | 公开版无 `.env` 启动时，浏览器可完成“生成 ¥24164 草稿 → 精确确认 → 写入模拟 ERP”；全量测试、覆盖率、预检、公开 CI 均通过后才创建 `v0.8.0` Release | 已完成并发布 | fix `a59a238`；PR #4 merge `f418e94`；main CI run 34760796785 双版本通过；HTTP 8/8；浏览器提交 `PO-DEMO-20260913-6F80`；Release `v0.8.0` |
-| S22 | 文档统一与飞书新路径实测 | 统一当前能力与测试口径；飞书完成“生成草稿 → 查看三行金额明细 → 精确确认 → 数据库写入”；关键动作不依赖模型临场判断 | 已完成 | 98/98；核心包覆盖率 89%；preflight 7/7；`ACT-CF37E6BCC0` → `PO-DEMO-20260914-BCC0`，状态 `COMMITTED` |
+| S22 | 文档统一与飞书新路径实测 | 统一当前能力与测试口径；飞书完成“生成草稿 → 查看三行金额明细 → 精确确认 → 数据库写入”；关键动作不依赖模型临场判断 | 已完成并发布 | 98/98；preflight 7/7；PR #6 merge `52caca0`；main CI `34800323232` 双版本通过；Release `v0.8.1` |
 
 ### 当前接续点
 
@@ -274,6 +274,15 @@
 ```
 
 ## 11. 工作日志
+
+### 2026-09-14 10:48
+
+- 本次目标：将已完成真实飞书验收的确定性金额明细与确认修复发布为 GitHub 补丁版本。
+- 实际完成：从公开 `origin/main` 创建 `fix/feishu-deterministic-v081`，仅同步 S22 修复；公开副本本地回归后创建 PR #6；PR 与合并后 main 的双 Python CI 均通过；发布正式 Release `v0.8.1`。
+- 验证结果：公开副本 `pytest -q` 98/98、`interview_preflight.py` 7/7；PR CI Python 3.11/3.12 分别 44 秒/54 秒通过；main run `34800323232` 分别 46 秒/51 秒通过；Release 非 draft、非 prerelease。
+- 发布证据：PR `https://github.com/qiandewucimi-cpu/erp-procurement-agent/pull/6`；merge `52caca0`；Release `https://github.com/qiandewucimi-cpu/erp-procurement-agent/releases/tag/v0.8.1`。
+- 遗留问题：无发布阻断项。后续除面试中发现的阻断级缺陷外，不再扩展功能。
+- 下一步第一动作：按 `docs/面试演示_5分钟.md` 彩排，并准备 90 秒项目介绍与安全边界追问。
 
 ### 2026-09-14 10:32
 
