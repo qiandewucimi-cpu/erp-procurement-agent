@@ -79,6 +79,89 @@ class PurchasePOAgent:
         lowered = text.lower()
         return next((name for name in sorted(filenames, key=len, reverse=True) if name.lower() in lowered), None)
 
+    def _trusted_action_id(self, session_id: str | None) -> str | None:
+        """从服务端会话中的真实工具结果取最近 action_id，不信任用户或模型文本。"""
+        for item in reversed(self.sessions.get(session_id or "", [])):
+            if item.get("role") != "tool":
+                continue
+            try:
+                payload = json.loads(item.get("content") or "{}")
+            except (TypeError, json.JSONDecodeError):
+                continue
+            action_id = payload.get("action_id") if isinstance(payload, dict) else None
+            if isinstance(action_id, str) and action_id:
+                return action_id
+        return None
+
+    def _trusted_draft(self, session_id: str | None) -> dict | None:
+        """从服务端保存的真实工具结果取最近采购草稿，不根据模型回答反推金额。"""
+        for item in reversed(self.sessions.get(session_id or "", [])):
+            if item.get("role") != "tool":
+                continue
+            try:
+                payload = json.loads(item.get("content") or "{}")
+            except (TypeError, json.JSONDecodeError):
+                continue
+            draft = payload.get("draft") if isinstance(payload, dict) else None
+            if isinstance(draft, dict) and isinstance(draft.get("items"), list):
+                return draft
+        return None
+
+    @staticmethod
+    def _draft_amount_reply(draft: dict) -> str:
+        """把确定性计算结果格式化成适合飞书卡片的金额明细。"""
+        currency = str(draft.get("currency") or "CNY")
+        lines = [
+            "**采购 PO 金额明细**",
+            f"供应商：{draft.get('supplier_name') or '-'}（{draft.get('supplier_code') or '-'}）",
+            "",
+        ]
+        for item in draft.get("items", []):
+            quantity = float(item.get("quantity", 0))
+            unit_price = float(item.get("unit_price", 0))
+            packaging_fee = float(item.get("packaging_fee", 0))
+            line_amount = float(item.get("line_amount", 0))
+            lines.append(
+                f"- {item.get('material_code', '-')} {item.get('material_name', '')}："
+                f"{quantity:g}{item.get('unit', '')} ×（单价 ¥{unit_price:g} + 包装费 ¥{packaging_fee:g}）"
+                f"= **¥{line_amount:g}**"
+            )
+        lines.extend(
+            [
+                "",
+                f"币种：{currency}",
+                f"**合计：¥{float(draft.get('total_amount', 0)):g}**",
+                "",
+                "以上仍是草稿，确认无误请完整输入「确认提交」。",
+            ]
+        )
+        return "\n".join(lines)
+
+    def _chat_amount_detail(self, messages: list[dict], session_id: str | None) -> tuple[str, list[dict], list[dict]]:
+        history = self.sessions.get(session_id or "", [])
+        full = history + list(messages)
+        draft = self._trusted_draft(session_id)
+        reply = self._draft_amount_reply(draft) if draft else "当前会话没有可查看的采购草稿，请先生成采购 PO 草稿。"
+        full.append({"role": "assistant", "content": reply})
+        return reply, [], full
+
+    def _chat_confirmation(self, messages: list[dict], session_id: str | None, actor: Actor | None) -> tuple[str, list[dict], list[dict]]:
+        """精确确认走确定性工具，避免模型在线时因编排波动反复询问。"""
+        history = self.sessions.get(session_id or "", [])
+        full = history + list(messages)
+        action_id = self._trusted_action_id(session_id)
+        if not action_id:
+            reply = "当前会话没有可确认的真实草稿，请先生成采购 PO 草稿。"
+            full.append({"role": "assistant", "content": reply})
+            return reply, [], full
+        arguments = {"action_id": action_id, "confirmation": "确认提交"}
+        raw = self.tools.call("confirm_commit", arguments) if actor is None else self.tools.call("confirm_commit", arguments, actor=actor)
+        payload = json.loads(raw)
+        reply = self._offline_reply("confirm_commit", payload)
+        trace = [{"step": 1, "tool": "confirm_commit", "arguments": arguments, "result": raw}]
+        full.extend([{"role": "tool", "name": "confirm_commit", "content": raw}, {"role": "assistant", "content": reply}])
+        return reply, trace, full
+
     def _chat_offline(self, messages: list[dict], session_id: str | None, actor: Actor | None) -> tuple[str, list[dict], list[dict]]:
         """无模型时提供可演示的确定性聊天降级，写入安全边界保持不变。"""
         history = self.sessions.get(session_id, []) if session_id else []
@@ -131,7 +214,15 @@ class PurchasePOAgent:
                     full = self.sessions[session_id] + list(messages)
                 else:
                     full = list(messages)
-                if self.loop.enabled:
+                latest_user = next(
+                    (str(item.get("content", "")).strip() for item in reversed(messages) if item.get("role") == "user"),
+                    "",
+                )
+                if latest_user == "确认提交":
+                    reply, trace, full = self._chat_confirmation(messages, session_id, actor)
+                elif "金额" in latest_user and any(word in latest_user for word in ("具体", "明细", "详细", "构成")):
+                    reply, trace, full = self._chat_amount_detail(messages, session_id)
+                elif self.loop.enabled:
                     reply, trace, full = self.loop.run(full, self.tools, actor=actor)
                 else:
                     reply, trace, full = self._chat_offline(messages, session_id, actor)

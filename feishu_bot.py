@@ -101,6 +101,11 @@ def _strip_mentions(text: str, mentions: list) -> str:
     return text.strip()
 
 
+def _normalize_confirmation(text: str) -> str:
+    """兼容飞书/输入法插入的空白，但不放宽确认口令的字符边界。"""
+    return "确认提交" if re.sub(r"\s+", "", text) == "确认提交" else text
+
+
 def _send_text(open_id: str, text: str) -> None:
     body = (
         CreateMessageRequestBody.builder()
@@ -339,7 +344,7 @@ def _on_message(data: P2ImMessageReceiveV1) -> None:
 
     # 4) 文本消息 → 直接交给 Agent
     if message_type == "text":
-        user_text = _strip_mentions(str(content.get("text", "")), mentions)
+        user_text = _normalize_confirmation(_strip_mentions(str(content.get("text", "")), mentions))
         print(f"[info] 收到文本 open_id={open_id} chat={message.chat_type} text={user_text!r}")
         if not user_text:
             _send_text(open_id, "我在，直接说需求就行～比如「查一下 MAT-FAB-001 的价格」。")

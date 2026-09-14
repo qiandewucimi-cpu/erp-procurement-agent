@@ -31,6 +31,8 @@ class TestToolRegistry(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertTrue(result["ready"])
         self.assertEqual(result["total_amount"], 24164.0)
+        self.assertEqual(len(result["draft"]["items"]), 3)
+        self.assertEqual(result["draft"]["items"][0]["line_amount"], 22740.0)
         self.assertIn("action_id", result)
 
     def test_create_purchase_order_abnormal_blocked(self):

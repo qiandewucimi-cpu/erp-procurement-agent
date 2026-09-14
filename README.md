@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/qiandewucimi-cpu/erp-procurement-agent/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
-![coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)
+![coverage](https://img.shields.io/badge/coverage-89%25-brightgreen)
 ![eval](https://img.shields.io/badge/eval-40%2F40%20passed-success)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -16,7 +16,7 @@
 |---|---|---|
 | 是否真是 Agent | Function Calling 自主选择 8 个工具、参数与顺序，支持多轮上下文 | `erp_agent/llm.py`、工具轨迹、MCP stdio 冒烟 |
 | 如何避免 LLM 误写 | 金额/校验/权限/状态迁移均为确定性代码；可信 action_id + 精确确认口令 | 25 条离线安全场景 + 15 条模型对抗场景，最近一次 40/40 |
-| 是否具备企业交付思维 | ERPAdapter 隔离客户接口；RBAC、发起/审批分离、幂等、审计、回滚 | 93/93 单测，覆盖率 90%，HTTP Adapter 故障与并发测试 |
+| 是否具备企业交付思维 | ERPAdapter 隔离客户接口；RBAC、发起/审批分离、幂等、审计、回滚 | 98/98 单测，核心包覆盖率 89%，HTTP Adapter 故障与并发测试 |
 | 出错能否定位 | request/session/actor/action/tool 关联 JSON 日志，提供延迟与成功率指标 | `GET /metrics`、递归脱敏测试 |
 | 如何落地客户试点 | 先只读与影子模式，再小范围受控写入；明确停止和回滚条件 | 需求、ADR、安全、验收、部署、排障、试点文档 |
 
@@ -213,7 +213,7 @@ python evals/run_rag_eval.py
 
 ## 四·一、模型配置（工具调用循环）
 
-`/agent/chat` 依赖具备工具调用（Function Calling）能力的模型来编排工具。模型只做编排，金额/校验/写入仍在确定性代码里；不配置模型时 `/agent/chat` 返回不可用提示，`/agent/prepare` 仍可离线运行。
+`/agent/chat` 在模型在线时依赖 Function Calling 编排工具。模型只做编排，金额/校验/写入仍在确定性代码里；不配置模型时，对话入口会切换到受控的确定性降级，仍可完成样例 BOM 草稿、物料查询、错误检测和精确确认演示，但不宣称模型在自主编排。
 
 ### 方式一：云端智谱（推荐，开箱即用）
 

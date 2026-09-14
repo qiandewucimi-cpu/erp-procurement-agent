@@ -377,6 +377,7 @@ class ToolRegistry:
                 "total_amount": draft["total_amount"],
                 "supplier": draft["supplier_name"],
                 "items_count": len(items),
+                "draft": draft,
                 "issues": [issue.model_dump() for issue in issues],
             },
             ensure_ascii=False,
