@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import math
 import logging
 import re
 import time
@@ -286,7 +287,7 @@ class PurchasePOAgent:
                 continue
             try:
                 quantity = float(row["quantity"])
-                if quantity <= 0:
+                if not math.isfinite(quantity) or quantity <= 0:
                     raise ValueError
             except (TypeError, ValueError):
                 issues.append(ValidationIssue(level="blocking", field=f"{code}.数量", message="数量必须是大于 0 的数字"))
@@ -299,8 +300,16 @@ class PurchasePOAgent:
                 issues.append(ValidationIssue(level="warning", field=code, message=f"BOM 名称“{row['material_name']}”与档案“{ref['material_name']}”不一致，以档案为准"))
             suppliers.add(ref["supplier_code"])
             currencies.add(ref["currency"])
-            unit_price = float(ref["unit_price"])
-            packaging_fee = float(ref["packaging_fee"])
+            try:
+                unit_price = float(ref["unit_price"])
+                packaging_fee = float(ref["packaging_fee"])
+                line_amount = quantity * (unit_price + packaging_fee)
+                if (not all(math.isfinite(v) for v in (unit_price, packaging_fee, line_amount))
+                        or unit_price < 0 or packaging_fee < 0):
+                    raise ValueError
+            except (TypeError, ValueError, OverflowError):
+                issues.append(ValidationIssue(level="blocking", field=code, message="单价、包装费或金额不是有效的有限非负数"))
+                continue
             items.append(
                 {
                     "line_no": index,
@@ -310,7 +319,7 @@ class PurchasePOAgent:
                     "unit": row["unit"] or "件",
                     "unit_price": unit_price,
                     "packaging_fee": packaging_fee,
-                    "line_amount": round(quantity * (unit_price + packaging_fee), 2),
+                    "line_amount": round(line_amount, 2),
                     "data_sources": ["上传的 BOM", "模拟 ERP 物料档案", "模拟价格/包装费表"],
                 }
             )
@@ -320,6 +329,10 @@ class PurchasePOAgent:
             issues.append(ValidationIssue(level="blocking", field="供应商", message="物料属于多个供应商，应拆分采购 PO"))
         if len(currencies) > 1:
             issues.append(ValidationIssue(level="blocking", field="币种", message="同一采购 PO 出现多个币种"))
+        total_amount = sum(item["line_amount"] for item in items)
+        if not math.isfinite(total_amount):
+            issues.append(ValidationIssue(level="blocking", field="总金额", message="金额总和超出有限数值范围"))
+            total_amount = 0.0
         ready = not any(issue.level == "blocking" for issue in issues)
         supplier = self.repository.material(items[0]["material_code"]) if items else None
         draft = {
@@ -331,7 +344,7 @@ class PurchasePOAgent:
             "payment_terms": "月结30天（演示规则）",
             "source_file": Path(filename).name,
             "items": items,
-            "total_amount": round(sum(item["line_amount"] for item in items), 2),
+            "total_amount": round(total_amount, 2),
         }
         trace.append(ToolStep(step=5, tool="validate_purchase_po", purpose="执行必填、档案、供应商和币种校验", result="通过，可等待确认" if ready else "存在阻断问题，禁止写入"))
 
