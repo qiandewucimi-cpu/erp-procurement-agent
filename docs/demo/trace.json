@@ -1,0 +1,240 @@
+{
+  "recorded_at": "2026-10-20T16:53:42.963235+00:00",
+  "mode": "deterministic_tool_replay_no_llm",
+  "data": "synthetic",
+  "events": [
+    {
+      "title": "01 正常 BOM：生成草稿",
+      "tool": "create_purchase_order",
+      "role": "operator",
+      "result": {
+        "ok": true,
+        "action_id": "ACT-A0BF3B09EA",
+        "ready": true,
+        "total_amount": 24164.0,
+        "supplier": "示例纺织供应商",
+        "items_count": 3,
+        "draft": {
+          "document_type": "采购PO",
+          "contract_no": "CT-DEMO-2026-0818",
+          "supplier_code": "SUP-001",
+          "supplier_name": "示例纺织供应商",
+          "currency": "CNY",
+          "payment_terms": "月结30天（演示规则）",
+          "source_file": "正常示例_BOM.xlsx",
+          "items": [
+            {
+              "line_no": 1,
+              "material_code": "MAT-FAB-001",
+              "material_name": "再生涤纶面料",
+              "quantity": 1200.0,
+              "unit": "米",
+              "unit_price": 18.6,
+              "packaging_fee": 0.35,
+              "line_amount": 22740.0,
+              "data_sources": [
+                "上传的 BOM",
+                "模拟 ERP 物料档案",
+                "模拟价格/包装费表"
+              ]
+            },
+            {
+              "line_no": 2,
+              "material_code": "MAT-ZIP-002",
+              "material_name": "尼龙拉链",
+              "quantity": 800.0,
+              "unit": "条",
+              "unit_price": 1.25,
+              "packaging_fee": 0.08,
+              "line_amount": 1064.0,
+              "data_sources": [
+                "上传的 BOM",
+                "模拟 ERP 物料档案",
+                "模拟价格/包装费表"
+              ]
+            },
+            {
+              "line_no": 3,
+              "material_code": "MAT-LBL-003",
+              "material_name": "洗水唛",
+              "quantity": 800.0,
+              "unit": "个",
+              "unit_price": 0.42,
+              "packaging_fee": 0.03,
+              "line_amount": 360.0,
+              "data_sources": [
+                "上传的 BOM",
+                "模拟 ERP 物料档案",
+                "模拟价格/包装费表"
+              ]
+            }
+          ],
+          "total_amount": 24164.0
+        },
+        "issues": []
+      }
+    },
+    {
+      "title": "02 权限：viewer 不可建单",
+      "tool": "create_purchase_order",
+      "role": "viewer",
+      "result": {
+        "ok": false,
+        "error": "PermissionDenied: 角色 viewer 无权执行 create_purchase_order"
+      }
+    },
+    {
+      "title": "03 异常 BOM：阻断提交",
+      "tool": "create_purchase_order",
+      "role": "operator",
+      "result": {
+        "ok": true,
+        "action_id": "ACT-D30D2F8787",
+        "ready": false,
+        "total_amount": 22740.0,
+        "supplier": "示例纺织供应商",
+        "items_count": 1,
+        "draft": {
+          "document_type": "采购PO",
+          "contract_no": "CT-DEMO-2026-0818",
+          "supplier_code": "SUP-001",
+          "supplier_name": "示例纺织供应商",
+          "currency": "CNY",
+          "payment_terms": "月结30天（演示规则）",
+          "source_file": "异常示例_BOM.xlsx",
+          "items": [
+            {
+              "line_no": 1,
+              "material_code": "MAT-FAB-001",
+              "material_name": "再生涤纶面料",
+              "quantity": 1200.0,
+              "unit": "米",
+              "unit_price": 18.6,
+              "packaging_fee": 0.35,
+              "line_amount": 22740.0,
+              "data_sources": [
+                "上传的 BOM",
+                "模拟 ERP 物料档案",
+                "模拟价格/包装费表"
+              ]
+            }
+          ],
+          "total_amount": 22740.0
+        },
+        "issues": [
+          {
+            "level": "warning",
+            "field": "MAT-FAB-001",
+            "message": "BOM 名称“涤纶面料（旧名称）”与档案“再生涤纶面料”不一致，以档案为准"
+          },
+          {
+            "level": "blocking",
+            "field": "MAT-UNKNOWN-999",
+            "message": "模拟 ERP 物料档案中不存在，需人工建档或修正编码"
+          },
+          {
+            "level": "blocking",
+            "field": "MAT-ZIP-002.数量",
+            "message": "数量必须是大于 0 的数字"
+          }
+        ]
+      }
+    },
+    {
+      "title": "04 独立审批人：审核草稿",
+      "tool": "approve_action",
+      "role": "approver",
+      "result": {
+        "ok": true,
+        "action_id": "ACT-A0BF3B09EA",
+        "status": "APPROVED",
+        "idempotent": false
+      }
+    },
+    {
+      "title": "05 精确确认：写入模拟单据",
+      "tool": "confirm_commit",
+      "role": "approver",
+      "result": {
+        "ok": true,
+        "po_no": "PO-DEMO-20261021-09EA",
+        "action_id": "ACT-A0BF3B09EA",
+        "status": "COMMITTED",
+        "idempotent": false
+      }
+    },
+    {
+      "title": "06 重复确认：不重复建单",
+      "tool": "confirm_commit",
+      "role": "approver",
+      "result": {
+        "ok": true,
+        "po_no": "PO-DEMO-20261021-09EA",
+        "action_id": "ACT-A0BF3B09EA",
+        "status": "COMMITTED",
+        "payload_json": "{\"document_type\": \"采购PO\", \"contract_no\": \"CT-DEMO-2026-0818\", \"supplier_code\": \"SUP-001\", \"supplier_name\": \"示例纺织供应商\", \"currency\": \"CNY\", \"payment_terms\": \"月结30天（演示规则）\", \"source_file\": \"正常示例_BOM.xlsx\", \"items\": [{\"line_no\": 1, \"material_code\": \"MAT-FAB-001\", \"material_name\": \"再生涤纶面料\", \"quantity\": 1200.0, \"unit\": \"米\", \"unit_price\": 18.6, \"packaging_fee\": 0.35, \"line_amount\": 22740.0, \"data_sources\": [\"上传的 BOM\", \"模拟 ERP 物料档案\", \"模拟价格/包装费表\"]}, {\"line_no\": 2, \"material_code\": \"MAT-ZIP-002\", \"material_name\": \"尼龙拉链\", \"quantity\": 800.0, \"unit\": \"条\", \"unit_price\": 1.25, \"packaging_fee\": 0.08, \"line_amount\": 1064.0, \"data_sources\": [\"上传的 BOM\", \"模拟 ERP 物料档案\", \"模拟价格/包装费表\"]}, {\"line_no\": 3, \"material_code\": \"MAT-LBL-003\", \"material_name\": \"洗水唛\", \"quantity\": 800.0, \"unit\": \"个\", \"unit_price\": 0.42, \"packaging_fee\": 0.03, \"line_amount\": 360.0, \"data_sources\": [\"上传的 BOM\", \"模拟 ERP 物料档案\", \"模拟价格/包装费表\"]}], \"total_amount\": 24164.0}",
+        "created_at": "2026-10-21T00:53:42+08:00",
+        "rolled_back_at": null,
+        "idempotent": true
+      }
+    },
+    {
+      "title": "07 审计：保留动作记录",
+      "tool": "repository.audit",
+      "role": "local_test",
+      "result": {
+        "orders": 1,
+        "audit": [
+          {
+            "id": 6,
+            "action_id": "ACT-A0BF3B09EA",
+            "event": "WRITE_COMMITTED",
+            "operator": "demo_approver",
+            "detail_json": "{\"po_no\": \"PO-DEMO-20261021-09EA\"}",
+            "created_at": "2026-10-21T00:53:42+08:00"
+          },
+          {
+            "id": 5,
+            "action_id": "ACT-A0BF3B09EA",
+            "event": "ACTION_APPROVED",
+            "operator": "demo_approver",
+            "detail_json": "{}",
+            "created_at": "2026-10-21T00:53:42+08:00"
+          },
+          {
+            "id": 4,
+            "action_id": "ACT-D30D2F8787",
+            "event": "APPROVAL_REQUESTED",
+            "operator": "demo_operator",
+            "detail_json": "{}",
+            "created_at": "2026-10-21T00:53:42+08:00"
+          },
+          {
+            "id": 3,
+            "action_id": "ACT-D30D2F8787",
+            "event": "DRAFT_CREATED",
+            "operator": "demo_operator",
+            "detail_json": "{\"ready\": false}",
+            "created_at": "2026-10-21T00:53:42+08:00"
+          },
+          {
+            "id": 2,
+            "action_id": "ACT-A0BF3B09EA",
+            "event": "APPROVAL_REQUESTED",
+            "operator": "demo_operator",
+            "detail_json": "{}",
+            "created_at": "2026-10-21T00:53:42+08:00"
+          },
+          {
+            "id": 1,
+            "action_id": "ACT-A0BF3B09EA",
+            "event": "DRAFT_CREATED",
+            "operator": "demo_operator",
+            "detail_json": "{\"ready\": true}",
+            "created_at": "2026-10-21T00:53:42+08:00"
+          }
+        ]
+      }
+    }
+  ]
+}

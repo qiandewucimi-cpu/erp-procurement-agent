@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 # 错误类型注册表：key 供代码引用，label 供报告展示，level 决定是否阻断。
 ERROR_TYPES: dict[str, dict] = {
     "empty_code": {"label": "编码为空", "level": "blocking"},
@@ -14,7 +16,8 @@ ERROR_TYPES: dict[str, dict] = {
 
 def _num(value) -> float | None:
     try:
-        return float(value)
+        result = float(value)
+        return result if math.isfinite(result) else None
     except (TypeError, ValueError):
         return None
 

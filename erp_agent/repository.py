@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -248,6 +249,9 @@ class ERPRepository:
                     packaging_fee = float(row.get("packaging_fee") or 0)
                 except (TypeError, ValueError):
                     skipped.append({"row": index, "material_code": code, "reason": "单价缺失或不是数字"})
+                    continue
+                if not math.isfinite(unit_price) or not math.isfinite(packaging_fee):
+                    skipped.append({"row": index, "material_code": code, "reason": "单价或包装费不是有限数"})
                     continue
                 if unit_price < 0 or packaging_fee < 0:
                     skipped.append({"row": index, "material_code": code, "reason": "单价或包装费为负数"})
