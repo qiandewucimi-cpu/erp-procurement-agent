@@ -55,7 +55,9 @@ else:
         "但 Agent 不会自主编排工具。请检查项目根目录 `.env` 里的 `LLM_API_KEY`。"
     )
 
-tab_chat, tab_audit = st.tabs(["Agent 对话", "审批、订单与审计"])
+tab_chat, tab_audit = st.tabs(
+    ["Agent 对话", "审批、订单与审计"], key="workspace_tab", on_change="rerun"
+)
 
 
 def render_trace(trace: list[dict]) -> None:
@@ -122,8 +124,9 @@ with tab_chat:
     # ---------------- 导入自己的 BOM ----------------
     with st.expander("📤 导入自己的 BOM（.xlsx / .xlsm / .csv）", expanded=False):
         st.caption(
-            "上传的文件只保存在本机 `uploads/` 目录，不会上传到任何外部服务，"
-            "也已被 .gitignore 排除，不会进 Git。文件格式需与示例 BOM 一致"
+            "上传文件保存在运行本服务的机器 `uploads/` 目录，已被 .gitignore 排除。"
+            "启用外部模型时，问题、文件名及工具返回的物料与金额明细可能发送给模型服务；"
+            "演示请使用合成数据。文件格式需与示例 BOM 一致"
             "（含物料编码、物料名称、数量、单位列）。"
         )
         # 提示已建档物料：避免用户导入自己的 BOM 后，因编码不匹配被判「未建档」而困惑
