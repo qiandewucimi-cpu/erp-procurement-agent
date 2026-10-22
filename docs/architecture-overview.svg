@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="400" viewBox="0 0 980 400" role="img">
+<title>采购原型：工具与人工的操作边界</title>
+<desc>用户 / HTTP / 飞书 → 模型编排 / 离线回退 → 查询规则与物料 → BOM校验与待审批草稿 → 人工审批与确认 → SQLite单据与审计。MCP复用同一业务工具层；默认鉴权关闭；未接入生产ERP。</desc>
+<rect width="980" height="400" rx="16" fill="#f6f8fa"/>
+<defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8" fill="none" stroke="#57606a" stroke-width="1.5"/></marker></defs>
+<text x="25" y="38" font-size="25" font-weight="700" fill="#1f2328" font-family="Microsoft YaHei,Arial,sans-serif">采购原型：工具与人工的操作边界</text>
+<path d="M305 115 H337" fill="none" stroke="#57606a" stroke-width="3" marker-end="url(#arrow)"/>
+<path d="M625 115 H657" fill="none" stroke="#57606a" stroke-width="3" marker-end="url(#arrow)"/>
+<path d="M805 160 V212" fill="none" stroke="#57606a" stroke-width="3" marker-end="url(#arrow)"/>
+<path d="M665 265 H633" fill="none" stroke="#57606a" stroke-width="3" marker-end="url(#arrow)"/>
+<path d="M345 265 H313" fill="none" stroke="#57606a" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="25" y="70" width="280" height="90" rx="10" fill="#ffffff" stroke="#8c959f"/>
+<text x="165" y="124" text-anchor="middle" font-size="25" fill="#0969da" font-family="Microsoft YaHei,Arial,sans-serif">用户 / HTTP / 飞书</text>
+<rect x="345" y="70" width="280" height="90" rx="10" fill="#ffffff" stroke="#8c959f"/>
+<text x="485" y="124" text-anchor="middle" font-size="25" fill="#0969da" font-family="Microsoft YaHei,Arial,sans-serif">模型编排 / 离线回退</text>
+<rect x="665" y="70" width="280" height="90" rx="10" fill="#ffffff" stroke="#8c959f"/>
+<text x="805" y="124" text-anchor="middle" font-size="25" fill="#0969da" font-family="Microsoft YaHei,Arial,sans-serif">查询规则与物料</text>
+<rect x="665" y="220" width="280" height="90" rx="10" fill="#ffffff" stroke="#8c959f"/>
+<text x="805" y="274" text-anchor="middle" font-size="25" fill="#0969da" font-family="Microsoft YaHei,Arial,sans-serif">BOM校验与待审批草稿</text>
+<rect x="345" y="220" width="280" height="90" rx="10" fill="#ffffff" stroke="#8c959f"/>
+<text x="485" y="274" text-anchor="middle" font-size="25" fill="#0969da" font-family="Microsoft YaHei,Arial,sans-serif">人工审批与确认</text>
+<rect x="25" y="220" width="280" height="90" rx="10" fill="#ffffff" stroke="#8c959f"/>
+<text x="165" y="274" text-anchor="middle" font-size="25" fill="#0969da" font-family="Microsoft YaHei,Arial,sans-serif">SQLite单据与审计</text>
+<text x="25" y="355" font-size="20" fill="#57606a" font-family="Microsoft YaHei,Arial,sans-serif">MCP复用同一业务工具层；默认鉴权关闭；未接入生产ERP。</text>
+</svg>
