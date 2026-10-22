@@ -25,17 +25,9 @@
 
 ## 如何工作
 
-```mermaid
-flowchart LR
-    U[用户 / HTTP / 飞书] --> A[意图与工具编排]
-    A --> Q[查询规则与物料]
-    A --> D[解析 BOM / 确定性金额与业务校验]
-    D --> P[待审批草稿]
-    P --> C[人工审批与确认]
-    C --> S[SQLite 模拟单据 / 审计]
-    M[MCP 客户端] --> T[同一业务工具层]
-    T --> D
-```
+![采购原型：工具与人工的操作边界](docs/architecture-overview.svg)
+
+[架构图源码](docs/architecture-overview.mmd)
 
 | 设计 | 实现与边界 |
 |---|---|
